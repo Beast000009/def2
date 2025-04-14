@@ -8,6 +8,7 @@ import Swap from "@/pages/Swap";
 import SpotTrading from "@/pages/SpotTrading";
 import Portfolio from "@/pages/Portfolio";
 import TransactionHistory from "@/pages/TransactionHistory";
+import Transfer from "@/pages/Transfer";
 import NotFound from "@/pages/not-found";
 import Layout from "@/components/Layout";
 import { Web3Provider } from "@/lib/web3Context";
@@ -21,6 +22,7 @@ function Router() {
         <Route path="/trade" component={SpotTrading} />
         <Route path="/portfolio" component={Portfolio} />
         <Route path="/history" component={TransactionHistory} />
+        <Route path="/transfer" component={Transfer} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

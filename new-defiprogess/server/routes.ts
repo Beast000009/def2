@@ -1129,6 +1129,119 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Handle token transfers
+  app.post("/api/transfers", async (req, res) => {
+    try {
+      const { walletAddress, tokenId, recipientAddress, amount, txHash } = req.body;
+
+      if (!walletAddress || !tokenId || !recipientAddress || !amount) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // Get or create user for sender
+      let sender = await storage.getUserByWalletAddress(walletAddress);
+      if (!sender) {
+        sender = await storage.createUser({
+          username: walletAddress.substring(0, 8),
+          email: null,
+          walletAddress: walletAddress,
+        });
+      }
+
+      // Get or create user for recipient
+      let recipient = await storage.getUserByWalletAddress(recipientAddress);
+      if (!recipient) {
+        recipient = await storage.createUser({
+          username: recipientAddress.substring(0, 8),
+          email: null,
+          walletAddress: recipientAddress,
+        });
+      }
+
+      // Get token
+      const token = await storage.getToken(tokenId);
+      if (!token) {
+        return res.status(400).json({ message: "Invalid token ID provided" });
+      }
+
+      // Create transaction record
+      const networkFee = simulateNetworkFee();
+      const transactionHash = txHash || simulateTxHash();
+
+      const transactionData = {
+        userId: sender.id,
+        type: "transfer",
+        status: "completed",
+        fromTokenId: tokenId,
+        toTokenId: tokenId, // Same token for transfers
+        fromAmount: amount,
+        toAmount: amount, // Same amount for transfers
+        price: "0", // No price for direct transfers
+        txHash: transactionHash,
+        networkFee,
+        timestamp: Date.now(),
+      };
+
+      const transaction = await storage.createTransaction(transactionData);
+
+      // Update sender balance
+      const senderBalance = await storage.getUserBalance(sender.id, tokenId);
+      if (senderBalance) {
+        const currentBalance = parseFloat(senderBalance.balance);
+        const newBalance = Math.max(0, currentBalance - parseFloat(amount)).toString();
+        
+        await storage.createOrUpdateUserBalance({
+          userId: sender.id,
+          tokenId,
+          balance: newBalance,
+          value: (parseFloat(newBalance) * parseFloat(token.price || "0")).toString(),
+        });
+      }
+
+      // Update recipient balance
+      const recipientBalance = await storage.getUserBalance(recipient.id, tokenId);
+      if (recipientBalance) {
+        const currentBalance = parseFloat(recipientBalance.balance);
+        const newBalance = (currentBalance + parseFloat(amount)).toString();
+        
+        await storage.createOrUpdateUserBalance({
+          userId: recipient.id,
+          tokenId,
+          balance: newBalance,
+          value: (parseFloat(newBalance) * parseFloat(token.price || "0")).toString(),
+        });
+      } else {
+        // Recipient doesn't have this token yet
+        await storage.createOrUpdateUserBalance({
+          userId: recipient.id,
+          tokenId,
+          balance: amount,
+          value: (parseFloat(amount) * parseFloat(token.price || "0")).toString(),
+        });
+      }
+
+      // Return transaction details
+      return res.status(201).json({
+        transactionId: transaction.id,
+        status: "completed",
+        type: "transfer",
+        token: {
+          id: token.id,
+          symbol: token.symbol,
+          name: token.name,
+        },
+        sender: walletAddress,
+        recipient: recipientAddress,
+        amount,
+        networkFee,
+        txHash: transactionHash
+      });
+
+    } catch (error) {
+      return handleApiError(res, error);
+    }
+  });
+
   // Get gas price (simulated)
   app.get("/api/gas-price", async (req, res) => {
     try {

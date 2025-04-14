@@ -25,6 +25,7 @@ const Layout = ({ children }: LayoutProps) => {
     { path: '/swap', icon: 'ri-swap-line', label: 'Swap' },
     { path: '/trade', icon: 'ri-stock-line', label: 'Spot Trading' },
     { path: '/portfolio', icon: 'ri-wallet-3-line', label: 'Portfolio' },
+    { path: '/transfer', icon: 'ri-send-plane-line', label: 'Transfer' },
     { path: '/history', icon: 'ri-history-line', label: 'Transaction History' },
   ];
 
