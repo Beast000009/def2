@@ -14,40 +14,18 @@ import axios from "axios";
 import { ethers } from "ethers";
 import fs from "fs";
 import path from "path";
+import { 
+  getTokenBalanceFromBlockchain, 
+  isTestTokenDeployed, 
+  getTestTokenAddress,
+  updateTestTokenAddress
+} from "./blockchain";
 
 // CoinGecko API key (Pro)
 const COINGECKO_API_KEY = "CG-9MWn3BvMDdiaG3kkjY3urPcj";
 
-// TestToken address
-const TEST_TOKEN_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
-
-// Function to get the real token balance from the blockchain
-const getTokenBalanceFromBlockchain = async (walletAddress: string, tokenAddress: string): Promise<string> => {
-  try {
-    // Connect to the Hardhat node
-    const provider = new ethers.JsonRpcProvider("http://127.0.0.1:8545");
-    
-    // ERC20 ABI (minimal)
-    const abi = [
-      "function balanceOf(address owner) view returns (uint256)",
-      "function decimals() view returns (uint8)"
-    ];
-    
-    const tokenContract = new ethers.Contract(tokenAddress, abi, provider);
-    
-    // Get balance first (we know TEST token has 18 decimals)
-    const balance = await tokenContract.balanceOf(walletAddress);
-    
-    // Format balance with 18 decimals for the TEST token
-    // This avoids potential issues with the decimals() function
-    const formattedBalance = ethers.formatUnits(balance, 18);
-    
-    return formattedBalance;
-  } catch (error) {
-    console.error(`Error fetching token balance from blockchain:`, error);
-    return "0"; // Return 0 balance if there's an error
-  }
-};
+// We'll keep this as a reference, but get the address dynamically
+let TEST_TOKEN_ADDRESS = getTestTokenAddress();
 
 // Nomics API base URL and key
 const NOMICS_API_URL = "https://api.nomics.com/v1";
@@ -788,18 +766,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           try {
             if (token.symbol === "TEST" && token.contractAddress) {
-              // Get real TEST token balance from blockchain
-              const realBalance = await getTokenBalanceFromBlockchain(walletAddress, TEST_TOKEN_ADDRESS);
-              console.log(`Real TEST balance for ${walletAddress}: ${realBalance}`);
+              // Check if the contract is deployed
+              const contractDeployed = await isTestTokenDeployed();
               
-              // Update stored balance if it's different (for future reference)
-              if (realBalance !== balance.balance) {
-                await storage.createOrUpdateUserBalance({
-                  userId: user.id,
-                  tokenId: token.id,
-                  balance: realBalance
-                });
-                tokenBalance = realBalance;
+              if (contractDeployed) {
+                // Get real TEST token balance from blockchain
+                const tokenAddress = getTestTokenAddress();
+                const realBalance = await getTokenBalanceFromBlockchain(walletAddress, tokenAddress);
+                console.log(`Real TEST balance for ${walletAddress}: ${realBalance}`);
+                
+                // Update stored balance if it's different (for future reference)
+                if (realBalance !== balance.balance) {
+                  await storage.createOrUpdateUserBalance({
+                    userId: user.id,
+                    tokenId: token.id,
+                    balance: realBalance
+                  });
+                  tokenBalance = realBalance;
+                }
+              } else {
+                console.log(`TEST token contract is not deployed. Using stored balance of ${balance.balance}`);
               }
             }
           } catch (blockchainError) {
