@@ -27,6 +27,25 @@ const WalletConnectModal = ({ isOpen, onClose }: WalletConnectModalProps) => {
         </DialogHeader>
         
         <div className="space-y-3 mb-6">
+          {/* Highlighted Direct Ganache Connection Option */}
+          <Button 
+            variant="outline" 
+            className="w-full flex items-center justify-between p-4 bg-blue-700 hover:bg-blue-600 border-transparent text-white"
+            onClick={() => handleConnectWallet('local')}
+            disabled={isConnecting}
+          >
+            <div className="flex items-center">
+              <div className="w-8 h-8 mr-3 flex items-center justify-center bg-blue-500 rounded-full">
+                <span className="text-white text-lg font-bold">G</span>
+              </div>
+              <div className="text-left">
+                <div className="font-medium">Local Ganache</div>
+                <div className="text-xs text-blue-200">Connect directly to Ganache at HTTP://127.0.0.1:7545</div>
+              </div>
+            </div>
+            <i className="ri-arrow-right-line"></i>
+          </Button>
+          
           <Button 
             variant="outline" 
             className="w-full flex items-center justify-between p-4 bg-neutral-700 hover:bg-neutral-600 border-transparent text-white"

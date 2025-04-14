@@ -23,16 +23,34 @@ export const CONTRACT_ADDRESSES = {
     ROUTER: "0xeE567Fe1712Faf6149d80dA1E6934E354124CfE3", // Uniswap V2 Router
     FACTORY: "0xF62c03E08ada871A0bEb309762E260a7a6a880E6", // Uniswap V2 Factory
   },
+  // Hardhat Local Network
+  31337: {
+    ROUTER: "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D", // Default Hardhat address
+    FACTORY: "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f", // Default Hardhat address
+  },
+  // Ganache Local Network (default port 7545)
+  5777: {
+    ROUTER: "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D", // Default Ganache address
+    FACTORY: "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f", // Default Ganache address
+  },
+  // Ganache Local Network (alternate port, typically 8545)
+  1337: {
+    ROUTER: "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D", // Default Ganache address
+    FACTORY: "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f", // Default Ganache address
+  },
   // Add other networks as needed
 };
 
+// Define provider type for flexibility
+type EthProvider = ethers.BrowserProvider | ethers.JsonRpcProvider;
+
 export class TokenSwapService {
-  private provider: ethers.BrowserProvider;
+  private provider: EthProvider;
   private signer: ethers.JsonRpcSigner;
   private chainId: number;
 
   constructor(
-    provider: ethers.BrowserProvider,
+    provider: EthProvider,
     signer: ethers.JsonRpcSigner,
     chainId: number,
   ) {
@@ -44,8 +62,14 @@ export class TokenSwapService {
   private getRouterAddress(): string {
     const addresses =
       CONTRACT_ADDRESSES[this.chainId as keyof typeof CONTRACT_ADDRESSES];
+    
     if (!addresses) {
-      throw new Error("Network not supported");
+      console.warn(`Network chainId ${this.chainId} not explicitly configured, using fallback addresses`);
+      // For development/testing, use default addresses for local chains
+      if (this.chainId < 1000000) { // Assuming local chain IDs are typically below this threshold
+        return "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D"; // Default Uniswap V2 Router for dev networks
+      }
+      throw new Error(`Network chainId ${this.chainId} not supported`);
     }
     return addresses.ROUTER;
   }
