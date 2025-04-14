@@ -106,7 +106,7 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd defiprogess && npm i && npx vite --port 5174 --host 0.0.0.0"
+args = "cd defiprogess/client && npm i && npx vite --port 5174 --host 0.0.0.0"
 waitForPort = 5174
 
 [[workflows.workflow]]
