@@ -21,7 +21,7 @@ args = "HardhatNode"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "DirectServer"
+args = "DevServer"
 
 [[workflows.workflow]]
 name = "DefiBlockchain"
@@ -53,7 +53,7 @@ args = "cd defiprogess/contracts && npx hardhat node"
 waitForPort = 8545
 
 [[workflows.workflow]]
-name = "DirectServer"
+name = "DevServer"
 author = "agent"
 
 [workflows.workflow.metadata]
@@ -64,7 +64,7 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd defiprogess && node direct-server.cjs"
+args = "cd defiprogess && npm run dev"
 waitForPort = 5000
 
 [deployment]
