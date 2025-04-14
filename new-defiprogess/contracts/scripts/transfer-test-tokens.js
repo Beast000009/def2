@@ -1,46 +1,44 @@
-// This script transfers test tokens to specified accounts
+// This script transfers TEST tokens to a specific wallet
 const hre = require("hardhat");
 const fs = require("fs");
 
 async function main() {
-  console.log("Transferring test tokens...");
-  
-  // Read the contract address from the JSON file
-  let contractData;
-  try {
-    contractData = JSON.parse(fs.readFileSync('contracts/test-token-address.json', 'utf8'));
-  } catch (error) {
-    console.error("Error reading contract address file:", error);
-    console.log("Please run deploy-test-token.js first to deploy the contract");
-    return;
-  }
+  // Read the contract address from the file
+  const contractData = JSON.parse(
+    fs.readFileSync("contracts/test-token-address.json", "utf8")
+  );
   
   const testTokenAddress = contractData.TestToken;
-  console.log(`Using TestToken at address: ${testTokenAddress}`);
+  console.log(`TestToken address: ${testTokenAddress}`);
   
-  // Get signers
-  const [deployer, ...accounts] = await hre.ethers.getSigners();
-  console.log(`Token owner: ${deployer.address}`);
-  
-  // Get contract instance
+  // Get the contract factory and connect to the deployed contract
   const TestToken = await hre.ethers.getContractFactory("TestToken");
   const testToken = TestToken.attach(testTokenAddress);
   
-  // Transfer tokens to all available accounts
-  const transferAmount = hre.ethers.parseEther("10000"); // 10,000 tokens
+  // Get signers (accounts)
+  const [deployer] = await hre.ethers.getSigners();
   
-  for (let i = 0; i < Math.min(accounts.length, 5); i++) {
-    const account = accounts[i];
-    console.log(`Transferring 10,000 TEST tokens to ${account.address}`);
-    
-    const tx = await testToken.transfer(account.address, transferAmount);
-    await tx.wait();
-    
-    const balance = await testToken.balanceOf(account.address);
-    console.log(`New balance: ${hre.ethers.formatEther(balance)} TEST`);
-  }
+  // Define recipient address - this will match our frontend wallet
+  // Using the second account from Hardhat as our test wallet
+  const accounts = await hre.ethers.getSigners();
+  const recipient = accounts[1]; // Second account in Hardhat
+  console.log(`Recipient address: ${recipient.address}`);
   
-  console.log("Transfers complete!");
+  // Transfer 1000 TEST tokens to the recipient
+  const transferAmount = hre.ethers.parseUnits("1000", 18); // 1000 tokens with 18 decimals
+  console.log(`Transferring ${hre.ethers.formatUnits(transferAmount, 18)} TEST tokens to ${recipient.address}...`);
+  
+  const tx = await testToken.transfer(recipient.address, transferAmount);
+  await tx.wait();
+  
+  // Check balances
+  const deployerBalance = await testToken.balanceOf(deployer.address);
+  const recipientBalance = await testToken.balanceOf(recipient.address);
+  
+  console.log(`Deployer balance: ${hre.ethers.formatUnits(deployerBalance, 18)} TEST`);
+  console.log(`Recipient balance: ${hre.ethers.formatUnits(recipientBalance, 18)} TEST`);
+  
+  console.log("Transfer complete!");
 }
 
 // Execute the script
