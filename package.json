@@ -1,0 +1,21 @@
+{
+  "name": "workspace",
+  "version": "1.0.0",
+  "description": "This script automatically clones the GitHub repository at https://github.com/Beast000009/defiprogess, installs dependencies, and runs the application.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@neondatabase/serverless": "^1.0.0",
+    "drizzle-kit": "^0.30.6",
+    "drizzle-orm": "^0.41.0",
+    "esbuild": "^0.25.2",
+    "express": "^5.1.0",
+    "tsx": "^4.19.3",
+    "vite": "^6.2.6"
+  }
+}
