@@ -26,7 +26,22 @@ export const getTestTokenContract = async () => {
 export const isTestTokenDeployed = async (): Promise<boolean> => {
   try {
     const provider = getProvider();
+    console.log(`Checking if TEST token is deployed at address: ${TEST_TOKEN_ADDRESS}`);
     const code = await provider.getCode(TEST_TOKEN_ADDRESS);
+    console.log(`Contract code length: ${code.length}, is deployed: ${code !== '0x'}`);
+    
+    // For debugging, try to call a function to verify it's the right contract
+    if (code !== '0x') {
+      try {
+        const abi = ["function name() view returns (string)"];
+        const tokenContract = new ethers.Contract(TEST_TOKEN_ADDRESS, abi, provider);
+        const name = await tokenContract.name();
+        console.log(`Contract name: ${name}`);
+      } catch (nameError) {
+        console.error("Error getting contract name:", nameError);
+      }
+    }
+    
     return code !== '0x';
   } catch (error) {
     console.error("Error checking TEST token deployment:", error);
