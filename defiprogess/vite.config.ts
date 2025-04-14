@@ -62,6 +62,6 @@ export default defineConfig({
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
       'Access-Control-Allow-Headers': 'X-Requested-With, content-type, Authorization'
     },
-    allowedHosts: true
+    allowedHosts: ["a935e2d3-e3ed-41e7-8283-268d1b299bad-00-1zrrzo9alsynl.spock.replit.dev", ".replit.dev", ".repl.co", "localhost"]
   },
 });
