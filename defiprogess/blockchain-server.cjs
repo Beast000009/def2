@@ -8,7 +8,11 @@ const app = express();
 const port = 5000;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: '*', // Allow all origins
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 
 // Logging middleware for debugging
@@ -343,12 +347,6 @@ app.post('/api/spot-trade', async (req, res) => {
 // We're not serving static files here anymore
 // Frontend is served by the npm run dev command (vite dev server)
 // This server only provides API endpoints
-
-// Setup CORS to allow the frontend to communicate with this API server
-app.use(cors({
-  origin: ['http://localhost:5173', 'http://0.0.0.0:5173'],
-  credentials: true
-}));
 
 // Provide instructions for the fallback route
 app.get('/', (req, res) => {

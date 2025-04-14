@@ -29,11 +29,11 @@ args = "BlockchainServer"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Dev Server"
+args = "ViteClient"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "ViteClient"
+args = "Client Dev"
 
 [[workflows.workflow]]
 name = "HardhatNode"
@@ -95,21 +95,6 @@ args = "cd defiprogess && node blockchain-server.cjs"
 waitForPort = 5000
 
 [[workflows.workflow]]
-name = "Dev Server"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd defiprogess && npm run dev"
-waitForPort = 5000
-
-[[workflows.workflow]]
 name = "ViteClient"
 author = "agent"
 
@@ -122,6 +107,21 @@ task = "packager.installForAll"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd defiprogess && node vite-frontend.cjs"
+waitForPort = 5173
+
+[[workflows.workflow]]
+name = "Client Dev"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd defiprogess && npx vite"
 waitForPort = 5173
 
 [deployment]

@@ -1,9 +1,9 @@
 import axios from 'axios';
-import { ArrowTrendingDown } from 'lucide-react'; // Added import for ArrowTrendingDown
 
 // Create an axios instance with default configuration
 const api = axios.create({
-  baseURL: 'http://0.0.0.0:5000',
+  // Use relative path for API calls to leverage the Vite proxy
+  baseURL: '/api',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json'
@@ -170,7 +170,7 @@ export interface ChartData {
 
 export const fetchTokens = async (): Promise<Token[]> => {
   try {
-    const response = await api.get("/api/tokens");
+    const response = await api.get("/tokens");
     return response.data;
   } catch (error) {
     return handleApiError(error);
@@ -179,7 +179,7 @@ export const fetchTokens = async (): Promise<Token[]> => {
 
 export const fetchTokenPrices = async (): Promise<TokenPrice[]> => {
   try {
-    const response = await api.get('/api/prices');
+    const response = await api.get('/prices');
     return response.data;
   } catch (error) {
     return handleApiError(error);
@@ -188,8 +188,24 @@ export const fetchTokenPrices = async (): Promise<TokenPrice[]> => {
 
 export const fetchChartData = async (coinSymbol: string, days: string = '1'): Promise<ChartData> => {
   try {
-    const response = await api.get(`/api/coins/${coinSymbol}/chart?days=${days}`);
-    return response.data;
+    const response = await api.get(`/chart/${coinSymbol}/${days}`);
+    // Transform the response to match the expected ChartData interface
+    const prices: Array<[number, number]> = [];
+    const marketCaps: Array<[number, number]> = [];
+    const totalVolumes: Array<[number, number]> = [];
+    
+    // Convert the response data points to the expected format
+    response.data.forEach((point: any) => {
+      const timestamp = new Date(point.timestamp).getTime();
+      const price = parseFloat(point.price);
+      prices.push([timestamp, price]);
+      
+      // Mock data for market caps and volumes since we don't have this data in our API
+      marketCaps.push([timestamp, price * 1000000000]);
+      totalVolumes.push([timestamp, price * 10000000]);
+    });
+    
+    return { prices, marketCaps, totalVolumes };
   } catch (error) {
     return handleApiError(error);
   }
@@ -197,7 +213,7 @@ export const fetchChartData = async (coinSymbol: string, days: string = '1'): Pr
 
 export const fetchPortfolio = async (walletAddress: string): Promise<Portfolio> => {
   try {
-    const response = await api.get(`/api/portfolio/${walletAddress}`);
+    const response = await api.get(`/portfolio/${walletAddress}`);
     return response.data;
   } catch (error) {
     return handleApiError(error);
@@ -206,7 +222,7 @@ export const fetchPortfolio = async (walletAddress: string): Promise<Portfolio> 
 
 export const fetchTransactions = async (walletAddress: string): Promise<Transaction[]> => {
   try {
-    const response = await api.get(`/api/transactions/${walletAddress}`);
+    const response = await api.get(`/transactions/${walletAddress}`);
     return response.data;
   } catch (error) {
     return handleApiError(error);
@@ -215,8 +231,14 @@ export const fetchTransactions = async (walletAddress: string): Promise<Transact
 
 export const fetchGasPrice = async (): Promise<GasPrice> => {
   try {
-    const response = await api.get('/gas-price');
-    return response.data;
+    const response = await api.get('/gas');
+    // Transform response to match expected GasPrice interface
+    const timestamp = new Date().toISOString();
+    return {
+      gasPrice: response.data.gasPrice,
+      unit: 'gwei',
+      timestamp
+    };
   } catch (error) {
     return handleApiError(error);
   }
@@ -225,7 +247,7 @@ export const fetchGasPrice = async (): Promise<GasPrice> => {
 export const swapTokens = async (params: SwapParams): Promise<SwapResponse> => {
   try {
     const response = await api.post('/swap', params);
-    return response.data;
+    return response.data.transaction;
   } catch (error) {
     return handleApiError(error);
   }
@@ -233,8 +255,17 @@ export const swapTokens = async (params: SwapParams): Promise<SwapResponse> => {
 
 export const executeTrade = async (params: TradeParams): Promise<TradeResponse> => {
   try {
-    const response = await api.post('/trade', params);
-    return response.data;
+    // Convert from buy/sell to BUY/SELL for the blockchain server
+    const apiParams = {
+      baseTokenId: params.tokenId,
+      quoteTokenId: params.baseTokenId,
+      side: params.type.toUpperCase(),
+      amount: params.amount,
+      price: params.price,
+      walletAddress: params.walletAddress
+    };
+    const response = await api.post('/spot-trade', apiParams);
+    return response.data.transaction;
   } catch (error) {
     return handleApiError(error);
   }
