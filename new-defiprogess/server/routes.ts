@@ -220,6 +220,24 @@ const getTokenPriceFromCoinGecko = async (
   return new Promise((resolve, reject) => {
     const fetchPrice = async () => {
       try {
+        // Special case for TEST token since it's not on CoinGecko
+        if (tokenSymbol === "TEST") {
+          const mockTestData = {
+            price: "5.25",
+            priceChange24h: "3.75",
+            volume24h: "15000000",
+            marketCap: "5250000"
+          };
+          
+          // Cache the data and return it
+          tokenPriceCache.set(tokenSymbol, {
+            data: mockTestData,
+            timestamp: Date.now(),
+          });
+          
+          return resolve(mockTestData);
+        }
+        
         // Convert token symbol to CoinGecko ID
         const coinId =
           COINGECKO_ID_MAP[tokenSymbol] || tokenSymbol.toLowerCase();
@@ -1143,7 +1161,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!sender) {
         sender = await storage.createUser({
           username: walletAddress.substring(0, 8),
-          email: null,
+          password: "password", // This is a demo app
           walletAddress: walletAddress,
         });
       }
@@ -1153,7 +1171,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!recipient) {
         recipient = await storage.createUser({
           username: recipientAddress.substring(0, 8),
-          email: null,
+          password: "password", // This is a demo app
           walletAddress: recipientAddress,
         });
       }
@@ -1193,8 +1211,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.createOrUpdateUserBalance({
           userId: sender.id,
           tokenId,
-          balance: newBalance,
-          value: (parseFloat(newBalance) * parseFloat(token.price || "0")).toString(),
+          balance: newBalance
         });
       }
 
@@ -1207,8 +1224,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.createOrUpdateUserBalance({
           userId: recipient.id,
           tokenId,
-          balance: newBalance,
-          value: (parseFloat(newBalance) * parseFloat(token.price || "0")).toString(),
+          balance: newBalance
         });
       } else {
         // Recipient doesn't have this token yet
