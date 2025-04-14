@@ -1196,8 +1196,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         toAmount: amount, // Same amount for transfers
         price: "0", // No price for direct transfers
         txHash: transactionHash,
-        networkFee,
-        timestamp: Date.now(),
+        networkFee
       };
 
       const transaction = await storage.createTransaction(transactionData);
@@ -1231,8 +1230,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.createOrUpdateUserBalance({
           userId: recipient.id,
           tokenId,
-          balance: amount,
-          value: (parseFloat(amount) * parseFloat(token.price || "0")).toString(),
+          balance: amount
         });
       }
 
