@@ -72,7 +72,7 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd defiprogess && npm run blockchain"
+args = "cd defiprogess && node blockchain-server.cjs"
 waitForPort = 5000
 
 [[workflows.workflow]]
@@ -87,7 +87,7 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd defiprogess && npm run dev"
+args = "cd defiprogess && node server-direct.cjs"
 waitForPort = 5000
 
 [[workflows.workflow]]
