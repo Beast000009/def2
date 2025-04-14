@@ -340,12 +340,52 @@ app.post('/api/spot-trade', async (req, res) => {
   }
 });
 
-// Serve static files
-app.use(express.static(path.join(__dirname, 'client')));
+// We're not serving static files here anymore
+// Frontend is served by the npm run dev command (vite dev server)
+// This server only provides API endpoints
 
-// Fallback route for SPA
+// Setup CORS to allow the frontend to communicate with this API server
+app.use(cors({
+  origin: ['http://localhost:5173', 'http://0.0.0.0:5173'],
+  credentials: true
+}));
+
+// Provide instructions for the fallback route
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'client', 'index.html'));
+  res.send(`
+    <html>
+      <head>
+        <title>DeFi Progress API Server</title>
+        <style>
+          body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+          h1 { color: #333; }
+          pre { background: #f4f4f4; padding: 10px; border-radius: 5px; }
+          .note { background: #fff8dc; padding: 10px; border-left: 4px solid #e8c000; margin: 20px 0; }
+        </style>
+      </head>
+      <body>
+        <h1>DeFi Progress API Server</h1>
+        <p>This server is running the blockchain API endpoints.</p>
+        <p>Available API endpoints:</p>
+        <ul>
+          <li><a href="/api/status">/api/status</a> - Check server status</li>
+          <li><a href="/api/tokens">/api/tokens</a> - Get available tokens</li>
+          <li><a href="/api/prices">/api/prices</a> - Get token prices</li>
+          <li>/api/portfolio/:walletAddress - Get user portfolio</li>
+          <li>/api/transactions/:walletAddress - Get user transactions</li>
+          <li>/api/gas - Get gas estimates</li>
+          <li>/api/chart/:symbol/:days - Get price chart data</li>
+          <li>POST /api/swap - Execute a token swap</li>
+          <li>POST /api/spot-trade - Execute a spot trade</li>
+        </ul>
+        <div class="note">
+          <p><strong>Note:</strong> The frontend application should be started separately using:</p>
+          <pre>cd defiprogess && npm run dev</pre>
+          <p>This will start the Vite dev server and serve the frontend application.</p>
+        </div>
+      </body>
+    </html>
+  `);
 });
 
 // Start the server

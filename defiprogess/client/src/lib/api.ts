@@ -3,7 +3,7 @@ import { ArrowTrendingDown } from 'lucide-react'; // Added import for ArrowTrend
 
 // Create an axios instance with default configuration
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: 'http://0.0.0.0:5000',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json'

@@ -18,12 +18,19 @@ export const TOKEN_SWAP_ABI = [
 
 // Contract addresses for different networks
 export const CONTRACT_ADDRESSES = {
-  // Ethereum Mainnet
+  // Local Hardhat Network (chainId: 31337)
+  31337: {
+    ROUTER: "0x959922bE3CAee4b8Cd9a407cc3ac1C251C2007B1", // TokenSwap Contract
+    ETH: "0x68B1D87F95878fE05B998F19b66F4baba5De1aed",
+    USDT: "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c",
+    BTC: "0xc6e7DF5E7b4f2A278906862b61205850344D4e7d",
+    LINK: "0x59b670e9fA9D0A427751Af201D676719a970857b",
+    SPOT_TRADING: "0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE"
+  },
+  // Ethereum Mainnet (for fallback)
   1: {
     ROUTER: "0xeE567Fe1712Faf6149d80dA1E6934E354124CfE3", // Uniswap V2 Router
-    FACTORY: "0xF62c03E08ada871A0bEb309762E260a7a6a880E6", // Uniswap V2 Factory
-  },
-  // Add other networks as needed
+  }
 };
 
 export class TokenSwapService {
