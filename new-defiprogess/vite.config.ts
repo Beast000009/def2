@@ -27,7 +27,8 @@ export default defineConfig({
         changeOrigin: true,
         secure: false
       }
-    }
+    },
+    allowedHosts: ['42cf6569-64ec-46e0-a30e-3de582939022-00-t9ovowgoav0n.pike.replit.dev', 'localhost', '.replit.dev']
   },
   plugins: [
     react(),
