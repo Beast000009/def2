@@ -13,29 +13,23 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "DefiBlockchain"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "HardhatNode"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
 args = "DirectServer"
 
-[[workflows.workflow]]
-name = "DefiBlockchain"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "SimpleServer"
 
 [[workflows.workflow.tasks]]
-task = "packager.installForAll"
+task = "workflow.run"
+args = "BlockchainServer"
 
 [[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node defiprogess/blockchain-server.cjs"
+task = "workflow.run"
+args = "Dev Server"
 
 [[workflows.workflow]]
 name = "HardhatNode"
@@ -50,7 +44,6 @@ task = "packager.installForAll"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd defiprogess/contracts && npx hardhat node"
-waitForPort = 8545
 
 [[workflows.workflow]]
 name = "DirectServer"
@@ -65,6 +58,51 @@ task = "packager.installForAll"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd defiprogess && node direct-server.cjs"
+waitForPort = 5000
+
+[[workflows.workflow]]
+name = "SimpleServer"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd defiprogess && node simple-server.js"
+waitForPort = 5000
+
+[[workflows.workflow]]
+name = "BlockchainServer"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd defiprogess && node blockchain-server.cjs"
+waitForPort = 5000
+
+[[workflows.workflow]]
+name = "Dev Server"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd defiprogess && npm run dev"
 waitForPort = 5000
 
 [deployment]

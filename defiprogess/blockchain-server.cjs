@@ -1,153 +1,356 @@
-// blockchain-server.cjs
-// This file sets up a simple server that deploys contracts to the local Hardhat node
-// Use separate nonces to avoid conflicts with other transactions
-// This is a one-time setup script that initializes the DeFi protocol
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
+const { ethers } = require('ethers');
 
-// Import the blockchain interface
-const blockchainInterface = require('./server-direct.cjs');
+// Initialize Express app
+const app = express();
+const port = 5000;
 
-async function main() {
-  console.log('Starting blockchain with integrated DeFi app...');
-  
-  try {
-    console.log('Hardhat node is ready. Deploying contracts...');
-    
-    // Destructure the blockchain interface
-    const {
-      tokenSwap,
-      spotTrading,
-      ethToken,
-      usdtToken,
-      btcToken,
-      linkToken,
-      CONTRACT_ADDRESSES,
-      parseAmount
-    } = blockchainInterface;
-    
-    // Setup transaction options with high gas limit for safety
-    const txOptions = { gasLimit: 3000000 };
-    
-    console.log('Initializing DeFi protocol...');
-    
-    // Add supported tokens to TokenSwap
-    console.log('Adding supported tokens to TokenSwap...');
-    try {
-      // Check if tokens are already supported to avoid nonce errors
-      const ethSupported = await tokenSwap.supportedTokens(CONTRACT_ADDRESSES.ETH);
-      if (!ethSupported) await tokenSwap.addSupportedToken(CONTRACT_ADDRESSES.ETH, txOptions);
-      
-      const usdtSupported = await tokenSwap.supportedTokens(CONTRACT_ADDRESSES.USDT);
-      if (!usdtSupported) await tokenSwap.addSupportedToken(CONTRACT_ADDRESSES.USDT, txOptions);
-      
-      const btcSupported = await tokenSwap.supportedTokens(CONTRACT_ADDRESSES.BTC);
-      if (!btcSupported) await tokenSwap.addSupportedToken(CONTRACT_ADDRESSES.BTC, txOptions);
-      
-      const linkSupported = await tokenSwap.supportedTokens(CONTRACT_ADDRESSES.LINK);
-      if (!linkSupported) await tokenSwap.addSupportedToken(CONTRACT_ADDRESSES.LINK, txOptions);
-    } catch (error) {
-      console.log('Error adding supported tokens to TokenSwap, they may already be supported:', error.message);
-    }
-    
-    // Add supported tokens to SpotTrading
-    console.log('Adding supported tokens to SpotTrading...');
-    try {
-      // Check if tokens are already supported to avoid nonce errors
-      const ethSupported = await spotTrading.supportedTokens(CONTRACT_ADDRESSES.ETH);
-      if (!ethSupported) await spotTrading.addSupportedToken(CONTRACT_ADDRESSES.ETH, txOptions);
-      
-      const usdtSupported = await spotTrading.supportedTokens(CONTRACT_ADDRESSES.USDT);
-      if (!usdtSupported) await spotTrading.addSupportedToken(CONTRACT_ADDRESSES.USDT, txOptions);
-      
-      const btcSupported = await spotTrading.supportedTokens(CONTRACT_ADDRESSES.BTC);
-      if (!btcSupported) await spotTrading.addSupportedToken(CONTRACT_ADDRESSES.BTC, txOptions);
-      
-      const linkSupported = await spotTrading.supportedTokens(CONTRACT_ADDRESSES.LINK);
-      if (!linkSupported) await spotTrading.addSupportedToken(CONTRACT_ADDRESSES.LINK, txOptions);
-    } catch (error) {
-      console.log('Error adding supported tokens to SpotTrading, they may already be supported:', error.message);
-    }
-    
-    // Set exchange rates
-    console.log('Setting exchange rates...');
-    try {
-      // ETH/USDT: 1 ETH = 3000 USDT
-      await tokenSwap.setExchangeRate(
-        CONTRACT_ADDRESSES.ETH, 
-        CONTRACT_ADDRESSES.USDT, 
-        parseAmount("3000", CONTRACT_ADDRESSES.ETH),
-        txOptions
-      );
-      
-      // USDT/ETH: 1 USDT = 0.000333 ETH
-      await tokenSwap.setExchangeRate(
-        CONTRACT_ADDRESSES.USDT, 
-        CONTRACT_ADDRESSES.ETH, 
-        parseAmount("0.000333", CONTRACT_ADDRESSES.ETH),
-        txOptions
-      );
-      
-      // BTC/USDT: 1 BTC = 60000 USDT
-      await tokenSwap.setExchangeRate(
-        CONTRACT_ADDRESSES.BTC, 
-        CONTRACT_ADDRESSES.USDT, 
-        parseAmount("60000", CONTRACT_ADDRESSES.ETH),
-        txOptions
-      );
-      
-      // USDT/BTC: 1 USDT = 0.0000166 BTC
-      await tokenSwap.setExchangeRate(
-        CONTRACT_ADDRESSES.USDT, 
-        CONTRACT_ADDRESSES.BTC, 
-        parseAmount("0.0000166", CONTRACT_ADDRESSES.ETH),
-        txOptions
-      );
-      
-      // LINK/USDT: 1 LINK = 15 USDT
-      await tokenSwap.setExchangeRate(
-        CONTRACT_ADDRESSES.LINK, 
-        CONTRACT_ADDRESSES.USDT, 
-        parseAmount("15", CONTRACT_ADDRESSES.ETH),
-        txOptions
-      );
-      
-      // USDT/LINK: 1 USDT = 0.0666 LINK
-      await tokenSwap.setExchangeRate(
-        CONTRACT_ADDRESSES.USDT, 
-        CONTRACT_ADDRESSES.LINK, 
-        parseAmount("0.0666", CONTRACT_ADDRESSES.ETH),
-        txOptions
-      );
-    } catch (error) {
-      console.log('Error setting exchange rates, they may already be set:', error.message);
-    }
-    
-    // Mint tokens to demo wallet address
-    console.log('Minting tokens to demo wallet address...');
-    try {
-      const demoWallet = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
-      
-      await ethToken.mint(demoWallet, parseAmount("10", CONTRACT_ADDRESSES.ETH), txOptions);
-      await usdtToken.mint(demoWallet, parseAmount("30000", CONTRACT_ADDRESSES.USDT), txOptions);
-      await btcToken.mint(demoWallet, parseAmount("0.5", CONTRACT_ADDRESSES.BTC), txOptions);
-      await linkToken.mint(demoWallet, parseAmount("1000", CONTRACT_ADDRESSES.LINK), txOptions);
-    } catch (error) {
-      console.log('Error minting tokens, they may already be minted:', error.message);
-    }
-    
-    console.log('DeFi protocol initialization complete!');
-    console.log('Ready to serve API requests.');
-    console.log('Contract Addresses:');
-    console.log(JSON.stringify(CONTRACT_ADDRESSES, null, 2));
-    
-  } catch (error) {
-    console.error('Error initializing blockchain:', error);
-    console.error(error.stack);
-    // Don't exit on error, just log it
-    // process.exit(1);
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+// Logging middleware for debugging
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  next();
+});
+
+// Contract addresses and ABIs
+const CONTRACT_ADDRESSES = {
+  TOKEN_SWAP: "0x959922bE3CAee4b8Cd9a407cc3ac1C251C2007B1",
+  SPOT_TRADING: "0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE",
+  ETH: "0x68B1D87F95878fE05B998F19b66F4baba5De1aed",
+  USDT: "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c",
+  BTC: "0xc6e7DF5E7b4f2A278906862b61205850344D4e7d",
+  LINK: "0x59b670e9fA9D0A427751Af201D676719a970857b"
+};
+
+// Connect to local Ethereum node
+const provider = new ethers.JsonRpcProvider('http://0.0.0.0:8545');
+
+// ERC20 minimal ABI
+const ERC20_ABI = [
+  "function name() view returns (string)",
+  "function symbol() view returns (string)",
+  "function decimals() view returns (uint8)",
+  "function totalSupply() view returns (uint256)",
+  "function balanceOf(address) view returns (uint256)",
+  "function transfer(address to, uint amount) returns (bool)",
+  "function allowance(address owner, address spender) view returns (uint256)",
+  "function approve(address spender, uint256 amount) returns (bool)",
+  "function transferFrom(address from, address to, uint256 amount) returns (bool)"
+];
+
+// TokenSwap minimal ABI
+const TOKEN_SWAP_ABI = [
+  "function addSupportedToken(address tokenAddress)",
+  "function getSupportedTokens() view returns (address[])",
+  "function getExchangeRate(address fromToken, address toToken) view returns (uint256)",
+  "function setExchangeRate(address fromToken, address toToken, uint256 rate)",
+  "function swapTokens(address fromToken, address toToken, uint256 amount) returns (uint256)"
+];
+
+// SpotTrading minimal ABI
+const SPOT_TRADING_ABI = [
+  "function addSupportedToken(address tokenAddress)",
+  "function getSupportedTokens() view returns (address[])",
+  "function placeBuyOrder(address baseToken, address quoteToken, uint256 amount, uint256 price)",
+  "function placeSellOrder(address baseToken, address quoteToken, uint256 amount, uint256 price)",
+  "function getOrderBook(address baseToken, address quoteToken) view returns (uint256[], uint256[], bool[])",
+  "function executeOrder(uint256 orderId)"
+];
+
+// Default tokens
+const defaultTokens = [
+  {
+    id: 1,
+    name: "Ethereum",
+    symbol: "ETH",
+    decimals: 18,
+    address: CONTRACT_ADDRESSES.ETH,
+    logoUrl: "https://cryptologos.cc/logos/ethereum-eth-logo.png",
+  },
+  {
+    id: 2,
+    name: "Bitcoin",
+    symbol: "BTC",
+    decimals: 8,
+    address: CONTRACT_ADDRESSES.BTC,
+    logoUrl: "https://cryptologos.cc/logos/bitcoin-btc-logo.png",
+  },
+  {
+    id: 3,
+    name: "Tether",
+    symbol: "USDT",
+    decimals: 6,
+    address: CONTRACT_ADDRESSES.USDT,
+    logoUrl: "https://cryptologos.cc/logos/tether-usdt-logo.png",
+  },
+  {
+    id: 4,
+    name: "Chainlink",
+    symbol: "LINK",
+    decimals: 18,
+    address: CONTRACT_ADDRESSES.LINK,
+    logoUrl: "https://cryptologos.cc/logos/chainlink-link-logo.png",
   }
-}
+];
 
-main().catch(error => {
-  console.error('Uncaught error in initialization:', error);
-  console.error(error.stack);
+// Mock token prices (will be replaced with real data later)
+const mockTokenPrices = [
+  { id: 1, tokenId: 1, price: 2856.25, change24h: 2.35, volume24h: 15765432.12 },
+  { id: 2, tokenId: 2, price: 62453.78, change24h: 1.24, volume24h: 25432876.54 },
+  { id: 3, tokenId: 3, price: 1.00, change24h: 0.01, volume24h: 87654123.45 },
+  { id: 4, tokenId: 4, price: 17.82, change24h: -3.45, volume24h: 5432876.12 }
+];
+
+// API endpoint for system status
+app.get('/api/status', (req, res) => {
+  res.json({ 
+    status: 'running',
+    provider: provider ? 'connected' : 'disconnected',
+    contracts: CONTRACT_ADDRESSES
+  });
+});
+
+// API endpoint for tokens list
+app.get('/api/tokens', (req, res) => {
+  console.log('Fetching tokens list');
+  res.json(defaultTokens);
+});
+
+// API endpoint for token prices
+app.get('/api/prices', (req, res) => {
+  console.log('Fetching token prices');
+  res.json(mockTokenPrices);
+});
+
+// API endpoint for portfolio by wallet address
+app.get('/api/portfolio/:walletAddress', async (req, res) => {
+  try {
+    const { walletAddress } = req.params;
+    console.log(`Fetching portfolio for ${walletAddress}`);
+    
+    // Initialize portfolio with default values
+    let portfolio = {
+      totalValue: 0,
+      totalProfitLoss: 0,
+      profitLossPercentage: 0,
+      assets: []
+    };
+
+    // Fetch balances for each token from the blockchain
+    for (const token of defaultTokens) {
+      try {
+        const tokenContract = new ethers.Contract(token.address, ERC20_ABI, provider);
+        const balance = await tokenContract.balanceOf(walletAddress);
+        
+        if (balance > 0) {
+          const tokenPrice = mockTokenPrices.find(p => p.tokenId === token.id);
+          const price = tokenPrice ? tokenPrice.price : 0;
+          
+          const balanceFormatted = ethers.formatUnits(balance, token.decimals);
+          const value = parseFloat(balanceFormatted) * price;
+          
+          portfolio.totalValue += value;
+          
+          portfolio.assets.push({
+            token: token,
+            balance: balanceFormatted,
+            value: value,
+            profit: value * 0.05,  // Mock 5% profit
+            profitPercentage: 5    // Mock 5% profit percentage
+          });
+        }
+      } catch (error) {
+        console.error(`Error fetching balance for ${token.symbol}:`, error);
+      }
+    }
+    
+    // Calculate overall profit/loss metrics
+    if (portfolio.assets.length > 0) {
+      portfolio.totalProfitLoss = portfolio.assets.reduce((sum, asset) => sum + asset.profit, 0);
+      portfolio.profitLossPercentage = (portfolio.totalProfitLoss / portfolio.totalValue) * 100;
+    }
+    
+    res.json(portfolio);
+  } catch (error) {
+    console.error('Error getting portfolio:', error);
+    res.status(500).json({ error: 'Failed to fetch portfolio data' });
+  }
+});
+
+// API endpoint for transaction history
+app.get('/api/transactions/:walletAddress', (req, res) => {
+  const { walletAddress } = req.params;
+  console.log(`Fetching transactions for ${walletAddress}`);
+  
+  // Hard-coded transaction history for demonstration
+  const transactions = [
+    {
+      id: 1,
+      type: 'SWAP',
+      status: 'COMPLETED',
+      timestamp: new Date(Date.now() - 3600000).toISOString(),
+      fromToken: defaultTokens[0],  // ETH
+      toToken: defaultTokens[2],    // USDT
+      fromAmount: '0.5',
+      toAmount: '1425.35',
+      txHash: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
+    },
+    {
+      id: 2,
+      type: 'SPOT_BUY',
+      status: 'COMPLETED',
+      timestamp: new Date(Date.now() - 86400000).toISOString(),
+      fromToken: defaultTokens[2],  // USDT
+      toToken: defaultTokens[1],    // BTC
+      fromAmount: '15000',
+      toAmount: '0.24',
+      price: '62500',
+      txHash: '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890'
+    }
+  ];
+  
+  res.json(transactions);
+});
+
+// API endpoint for gas estimations
+app.get('/api/gas', (req, res) => {
+  // Mock gas data
+  res.json({
+    gasPrice: '25', 
+    gasLimit: {
+      swap: 150000,
+      approve: 50000,
+      spotTrade: 200000
+    }
+  });
+});
+
+// API endpoint for price charts
+app.get('/api/chart/:symbol/:days', (req, res) => {
+  const { symbol, days } = req.params;
+  console.log(`Fetching chart data for ${symbol} over ${days} days`);
+  
+  const daysCount = parseInt(days) || 7;
+  const dataPoints = [];
+  
+  const token = defaultTokens.find(t => t.symbol === symbol);
+  const tokenId = token ? token.id : 1;
+  const currentPrice = mockTokenPrices.find(p => p.tokenId === tokenId)?.price || 100;
+  
+  let price = currentPrice;
+  const now = Date.now();
+  const interval = (daysCount * 24 * 60 * 60 * 1000) / 100;
+  
+  for (let i = 100; i >= 0; i--) {
+    const change = (Math.random() - 0.5) * 0.02;
+    price = price * (1 + change);
+    
+    dataPoints.push({
+      timestamp: new Date(now - (i * interval)).toISOString(),
+      price: price.toFixed(2)
+    });
+  }
+  
+  res.json(dataPoints);
+});
+
+// API endpoint for token swaps
+app.post('/api/swap', async (req, res) => {
+  try {
+    const { fromTokenId, toTokenId, amount, walletAddress } = req.body;
+    
+    console.log(`Swapping ${amount} from token ${fromTokenId} to token ${toTokenId} for ${walletAddress}`);
+    
+    const fromToken = defaultTokens.find(t => t.id === fromTokenId);
+    const toToken = defaultTokens.find(t => t.id === toTokenId);
+    
+    if (!fromToken || !toToken) {
+      return res.status(400).json({ error: 'Invalid token ID' });
+    }
+    
+    // Mock exchange rate based on token prices
+    const fromPrice = mockTokenPrices.find(p => p.tokenId === fromTokenId)?.price || 1;
+    const toPrice = mockTokenPrices.find(p => p.tokenId === toTokenId)?.price || 1;
+    const rate = fromPrice / toPrice;
+    
+    const receivedAmount = parseFloat(amount) * rate;
+    
+    // Create transaction record
+    const transaction = {
+      id: Date.now(),
+      type: 'SWAP',
+      status: 'PENDING',
+      timestamp: new Date().toISOString(),
+      fromToken,
+      toToken,
+      fromAmount: amount,
+      toAmount: receivedAmount.toFixed(8),
+      txHash: `0x${Math.random().toString(16).substr(2, 64)}`
+    };
+    
+    res.json({ 
+      transaction,
+      exchangeRate: rate 
+    });
+  } catch (error) {
+    console.error('Swap error:', error);
+    res.status(500).json({ error: 'Failed to execute swap' });
+  }
+});
+
+// API endpoint for spot trading
+app.post('/api/spot-trade', async (req, res) => {
+  try {
+    const { baseTokenId, quoteTokenId, side, amount, price, walletAddress } = req.body;
+    
+    console.log(`Placing ${side} order for ${amount} of token ${baseTokenId} at price ${price} (quote token ${quoteTokenId}) for ${walletAddress}`);
+    
+    const baseToken = defaultTokens.find(t => t.id === baseTokenId);
+    const quoteToken = defaultTokens.find(t => t.id === quoteTokenId);
+    
+    if (!baseToken || !quoteToken) {
+      return res.status(400).json({ error: 'Invalid token ID' });
+    }
+    
+    const total = parseFloat(amount) * parseFloat(price);
+    
+    // Create transaction record
+    const transaction = {
+      id: Date.now(),
+      type: side === 'BUY' ? 'SPOT_BUY' : 'SPOT_SELL',
+      status: 'PENDING',
+      timestamp: new Date().toISOString(),
+      fromToken: side === 'BUY' ? quoteToken : baseToken,
+      toToken: side === 'BUY' ? baseToken : quoteToken,
+      fromAmount: side === 'BUY' ? total.toFixed(quoteToken.decimals) : amount,
+      toAmount: side === 'BUY' ? amount : total.toFixed(quoteToken.decimals),
+      price: price,
+      txHash: `0x${Math.random().toString(16).substr(2, 64)}`
+    };
+    
+    res.json({ transaction });
+  } catch (error) {
+    console.error('Spot trade error:', error);
+    res.status(500).json({ error: 'Failed to execute spot trade' });
+  }
+});
+
+// Serve static files
+app.use(express.static(path.join(__dirname, 'client')));
+
+// Fallback route for SPA
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'client', 'index.html'));
+});
+
+// Start the server
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Server running on port ${port}`);
+  console.log(`API available at http://0.0.0.0:${port}/api`);
+  console.log(`UI available at http://0.0.0.0:${port}`);
 });

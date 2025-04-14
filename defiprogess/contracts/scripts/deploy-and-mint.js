@@ -1,13 +1,19 @@
 const hre = require("hardhat");
 
 async function main() {
-  console.log("Deploying contracts...");
+  console.log("Deploying contracts and initializing tokens...");
 
-  // Get the default signer
-  const [deployer] = await hre.ethers.getSigners();
-  console.log("Deploying contracts with the account:", deployer.address);
+  // Get several test accounts
+  const [deployer, user1, user2, user3] = await hre.ethers.getSigners();
+  
+  console.log("Deployer address:", deployer.address);
+  console.log("Test accounts:");
+  console.log("User1:", user1.address);
+  console.log("User2:", user2.address);
+  console.log("User3:", user3.address);
   
   // Deploy TokenSwap
+  console.log("\nDeploying TokenSwap...");
   const TokenSwap = await hre.ethers.getContractFactory("TokenSwap");
   const tokenSwap = await TokenSwap.deploy();
   await tokenSwap.waitForDeployment();
@@ -15,12 +21,16 @@ async function main() {
   console.log("TokenSwap deployed to:", tokenSwapAddress);
 
   // Deploy SpotTrading
+  console.log("\nDeploying SpotTrading...");
   const SpotTrading = await hre.ethers.getContractFactory("SpotTrading");
   const spotTrading = await SpotTrading.deploy();
   await spotTrading.waitForDeployment();
   const spotTradingAddress = await spotTrading.getAddress();
   console.log("SpotTrading deployed to:", spotTradingAddress);
 
+  // Deploy mock tokens
+  console.log("\nDeploying mock tokens...");
+  
   // Deploy ETH token
   const ETHToken = await hre.ethers.getContractFactory("ERC20Mock");
   const ethToken = await ETHToken.deploy("Wrapped Ether", "ETH", 18);
@@ -119,23 +129,88 @@ async function main() {
   );
   console.log("Exchange rates set");
 
-  // Mint tokens to a demo wallet
-  console.log("\nMinting tokens to demo wallet...");
+  // Mint tokens to accounts
+  console.log("\nMinting tokens to test accounts...");
   
-  // Mint 10 ETH tokens
-  await ethToken.mint(deployer.address, hre.ethers.parseEther("10"));
+  // Mint to deployer
+  console.log("Minting to deployer:", deployer.address);
+  await ethToken.mint(deployer.address, hre.ethers.parseEther("50"));
+  await btcToken.mint(deployer.address, hre.ethers.parseUnits("2", 8));
+  await usdtToken.mint(deployer.address, hre.ethers.parseUnits("100000", 6));
+  await linkToken.mint(deployer.address, hre.ethers.parseEther("5000"));
   
-  // Mint 0.5 BTC tokens
-  await btcToken.mint(deployer.address, hre.ethers.parseUnits("0.5", 8));
+  // Mint to user1
+  console.log("Minting to user1:", user1.address);
+  await ethToken.mint(user1.address, hre.ethers.parseEther("20"));
+  await btcToken.mint(user1.address, hre.ethers.parseUnits("0.75", 8));
+  await usdtToken.mint(user1.address, hre.ethers.parseUnits("50000", 6));
+  await linkToken.mint(user1.address, hre.ethers.parseEther("2000"));
   
-  // Mint 30000 USDT tokens
-  await usdtToken.mint(deployer.address, hre.ethers.parseUnits("30000", 6));
+  // Mint to user2
+  console.log("Minting to user2:", user2.address);
+  await ethToken.mint(user2.address, hre.ethers.parseEther("15"));
+  await btcToken.mint(user2.address, hre.ethers.parseUnits("0.5", 8));
+  await usdtToken.mint(user2.address, hre.ethers.parseUnits("40000", 6));
+  await linkToken.mint(user2.address, hre.ethers.parseEther("1500"));
   
-  // Mint 1000 LINK tokens
-  await linkToken.mint(deployer.address, hre.ethers.parseEther("1000"));
+  // Mint to user3
+  console.log("Minting to user3:", user3.address);
+  await ethToken.mint(user3.address, hre.ethers.parseEther("10"));
+  await btcToken.mint(user3.address, hre.ethers.parseUnits("0.25", 8));
+  await usdtToken.mint(user3.address, hre.ethers.parseUnits("30000", 6));
+  await linkToken.mint(user3.address, hre.ethers.parseEther("1000"));
   
-  console.log("Tokens minted to:", deployer.address);
-  console.log("Deployment and initialization complete!");
+  console.log("All tokens minted successfully");
+
+  // Verify balances
+  console.log("\nVerifying token balances...");
+  
+  try {
+    // Deployer balances
+    console.log("Deployer balances:");
+    const deployerEthBalance = await ethToken.balanceOf(deployer.address);
+    const deployerBtcBalance = await btcToken.balanceOf(deployer.address);
+    const deployerUsdtBalance = await usdtToken.balanceOf(deployer.address);
+    const deployerLinkBalance = await linkToken.balanceOf(deployer.address);
+    
+    console.log("ETH:", hre.ethers.formatEther(deployerEthBalance));
+    console.log("BTC:", hre.ethers.formatUnits(deployerBtcBalance, 8));
+    console.log("USDT:", hre.ethers.formatUnits(deployerUsdtBalance, 6));
+    console.log("LINK:", hre.ethers.formatEther(deployerLinkBalance));
+    
+    // User1 balances
+    console.log("\nUser1 balances:");
+    const user1EthBalance = await ethToken.balanceOf(user1.address);
+    const user1BtcBalance = await btcToken.balanceOf(user1.address);
+    const user1UsdtBalance = await usdtToken.balanceOf(user1.address);
+    const user1LinkBalance = await linkToken.balanceOf(user1.address);
+    
+    console.log("ETH:", hre.ethers.formatEther(user1EthBalance));
+    console.log("BTC:", hre.ethers.formatUnits(user1BtcBalance, 8));
+    console.log("USDT:", hre.ethers.formatUnits(user1UsdtBalance, 6));
+    console.log("LINK:", hre.ethers.formatEther(user1LinkBalance));
+  } catch (error) {
+    console.error("Error verifying balances:", error.message);
+  }
+
+  // Save the new contract addresses to a JSON file
+  const fs = require("fs");
+  const contractAddresses = {
+    TOKEN_SWAP: tokenSwapAddress,
+    SPOT_TRADING: spotTradingAddress,
+    ETH: ethTokenAddress,
+    USDT: usdtTokenAddress,
+    BTC: btcTokenAddress,
+    LINK: linkTokenAddress
+  };
+  
+  fs.writeFileSync(
+    "./contract-addresses.json", 
+    JSON.stringify(contractAddresses, null, 2)
+  );
+  console.log("\nContract addresses saved to contract-addresses.json");
+  
+  console.log("\nDeployment, initialization, and minting complete!");
 }
 
 main()

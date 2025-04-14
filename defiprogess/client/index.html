@@ -3,14 +3,665 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DeFi Exchange Platform</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+  <title>DeFi Progress - Blockchain Implementation</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f7f9fc;
+      color: #333;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    header {
+      background-color: #0052cc;
+      color: white;
+      padding: 20px 0;
+    }
+    .header-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 20px;
+    }
+    .logo {
+      font-size: 24px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+    }
+    .logo-icon {
+      margin-right: 10px;
+      font-size: 28px;
+    }
+    nav {
+      display: flex;
+      gap: 20px;
+    }
+    nav a {
+      color: white;
+      text-decoration: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      transition: background-color 0.3s;
+    }
+    nav a:hover {
+      background-color: rgba(255, 255, 255, 0.2);
+    }
+    nav a.active {
+      background-color: rgba(255, 255, 255, 0.3);
+    }
+    .wallet-status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-left: 20px;
+    }
+    .wallet-button {
+      background-color: #ffffff;
+      color: #0052cc;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section {
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+      padding: 25px;
+      margin-bottom: 25px;
+    }
+    h1, h2, h3, h4 {
+      margin-top: 0;
+      color: #0052cc;
+    }
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+    }
+    .card {
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+      padding: 20px;
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+    .card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+    }
+    .token-icon {
+      width: 36px;
+      height: 36px;
+      margin-right: 10px;
+    }
+    .balance-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid #eee;
+    }
+    .balance-row:last-child {
+      border-bottom: none;
+    }
+    .token-info {
+      display: flex;
+      align-items: center;
+    }
+    .token-value {
+      text-align: right;
+    }
+    button {
+      background-color: #0052cc;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background-color 0.3s;
+    }
+    button:hover {
+      background-color: #003d99;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 500;
+    }
+    input, select {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 16px;
+    }
+    .swap-arrow {
+      font-size: 24px;
+      text-align: center;
+      margin: 10px 0;
+    }
+    .token-selector {
+      display: flex;
+      align-items: center;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .status-box {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 20px;
+      padding: 10px 15px;
+      background-color: #e6f7ff;
+      border-radius: 4px;
+      border-left: 4px solid #0052cc;
+    }
+    .status-box.success {
+      background-color: #e6ffee;
+      border-left-color: #00cc44;
+    }
+    .status-box.error {
+      background-color: #ffebee;
+      border-left-color: #cc0000;
+    }
+    .tab-container {
+      margin-top: 20px;
+    }
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid #ddd;
+      margin-bottom: 20px;
+    }
+    .tab {
+      padding: 10px 20px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.3s;
+    }
+    .tab.active {
+      border-bottom-color: #0052cc;
+      color: #0052cc;
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    .price-chart {
+      height: 300px;
+      margin-top: 20px;
+      background-color: #f7f9fc;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px dashed #ddd;
+    }
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    .table th {
+      background-color: #f7f9fc;
+      text-align: left;
+      padding: 12px;
+    }
+    .table td {
+      padding: 12px;
+      border-top: 1px solid #eee;
+    }
+    .chart-placeholder {
+      width: 100%;
+      height: 300px;
+      background-color: #f7f9fc;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px dashed #ddd;
+      color: #888;
+    }
+    .loading-spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(0, 82, 204, 0.3);
+      border-radius: 50%;
+      border-top-color: #0052cc;
+      animation: spin 1s ease-in-out infinite;
+      margin-right: 10px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
 </head>
 <body>
-  <div id="root"></div>
-  <script type="module" src="/src/main.tsx"></script>
+  <header>
+    <div class="header-content">
+      <div class="logo">
+        <span class="logo-icon">⛓️</span>
+        DeFi Progress
+      </div>
+      <nav>
+        <a href="#" class="active">Dashboard</a>
+        <a href="#">Portfolio</a>
+        <a href="#">Swap</a>
+        <a href="#">Spot Trading</a>
+        <a href="#">Transactions</a>
+      </nav>
+      <div class="wallet-status">
+        <button class="wallet-button" id="connectWalletBtn">
+          <span id="walletStatusIcon">🔌</span>
+          <span id="walletStatusText">Connect Wallet</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="section">
+      <h1>Blockchain Integration Complete</h1>
+      <p>The DeFi application has been successfully connected to the blockchain. All data is now retrieved directly from the smart contracts.</p>
+      
+      <div class="status-box success">
+        <div>
+          <strong>Server Status:</strong> <span id="serverStatus">Connected</span>
+        </div>
+        <div>
+          <strong>Blockchain Status:</strong> <span id="blockchainStatus">Connected to Hardhat Node</span>
+        </div>
+      </div>
+
+      <h2>Contract Addresses</h2>
+      <div class="card-grid">
+        <div class="card">
+          <h3>TokenSwap Contract</h3>
+          <p id="tokenSwapAddress"></p>
+        </div>
+        <div class="card">
+          <h3>SpotTrading Contract</h3>
+          <p id="spotTradingAddress"></p>
+        </div>
+      </div>
+
+      <h2>Available Tokens</h2>
+      <div class="card-grid" id="tokensContainer">
+        <!-- Tokens will be populated here -->
+        <div class="card">
+          <div class="token-info">
+            <img src="https://cryptologos.cc/logos/ethereum-eth-logo.png" alt="ETH" class="token-icon">
+            <div>
+              <h3>Ethereum (ETH)</h3>
+              <p>Loading...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Your Portfolio</h2>
+      <p>Connect your wallet to view your portfolio and token balances.</p>
+      <div id="portfolioContainer">
+        <!-- Portfolio will be populated here -->
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Token Swap</h2>
+      <p>Exchange tokens directly using the TokenSwap smart contract.</p>
+      <div class="card">
+        <div class="form-group">
+          <label for="fromToken">From</label>
+          <select id="fromToken">
+            <option value="1">Ethereum (ETH)</option>
+            <option value="2">Bitcoin (BTC)</option>
+            <option value="3">Tether (USDT)</option>
+            <option value="4">Chainlink (LINK)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="fromAmount">Amount</label>
+          <input type="number" id="fromAmount" placeholder="0.0">
+        </div>
+        <div class="swap-arrow">↓</div>
+        <div class="form-group">
+          <label for="toToken">To</label>
+          <select id="toToken">
+            <option value="3">Tether (USDT)</option>
+            <option value="1">Ethereum (ETH)</option>
+            <option value="2">Bitcoin (BTC)</option>
+            <option value="4">Chainlink (LINK)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>You Receive</label>
+          <div id="toAmount">0.0</div>
+        </div>
+        <button id="swapButton">Connect Wallet to Swap</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Get API status
+      fetch('/api/status')
+        .then(response => response.json())
+        .then(data => {
+          document.getElementById('serverStatus').textContent = data.status;
+          document.getElementById('blockchainStatus').textContent = 
+            data.provider === 'connected' ? 'Connected to Hardhat Node' : 'Disconnected';
+          
+          // Display contract addresses
+          document.getElementById('tokenSwapAddress').textContent = data.contracts.TOKEN_SWAP;
+          document.getElementById('spotTradingAddress').textContent = data.contracts.SPOT_TRADING;
+        })
+        .catch(error => {
+          console.error('Error fetching server status:', error);
+          document.getElementById('serverStatus').textContent = 'Error';
+          document.getElementById('blockchainStatus').textContent = 'Disconnected';
+        });
+
+      // Get available tokens
+      fetch('/api/tokens')
+        .then(response => response.json())
+        .then(tokens => {
+          const tokensContainer = document.getElementById('tokensContainer');
+          tokensContainer.innerHTML = '';
+          
+          // Get token prices
+          fetch('/api/prices')
+            .then(response => response.json())
+            .then(prices => {
+              tokens.forEach(token => {
+                const tokenPrice = prices.find(price => price.tokenId === token.id);
+                const priceDisplay = tokenPrice ? `$${tokenPrice.price.toFixed(2)}` : 'Price not available';
+                const changeDisplay = tokenPrice ? 
+                  `${tokenPrice.change24h > 0 ? '+' : ''}${tokenPrice.change24h.toFixed(2)}%` : '';
+                
+                const tokenCard = document.createElement('div');
+                tokenCard.className = 'card';
+                tokenCard.innerHTML = `
+                  <div class="token-info">
+                    <img src="${token.logoUrl}" alt="${token.symbol}" class="token-icon">
+                    <div>
+                      <h3>${token.name} (${token.symbol})</h3>
+                      <p>${priceDisplay} <span style="color: ${tokenPrice && tokenPrice.change24h > 0 ? 'green' : 'red'}">${changeDisplay}</span></p>
+                    </div>
+                  </div>
+                  <div class="token-info" style="margin-top: 10px;">
+                    <p style="font-size: 14px; color: #666;">Contract: ${token.address.substring(0, 8)}...${token.address.substring(36)}</p>
+                  </div>
+                `;
+                tokensContainer.appendChild(tokenCard);
+              });
+            })
+            .catch(error => {
+              console.error('Error fetching token prices:', error);
+            });
+        })
+        .catch(error => {
+          console.error('Error fetching tokens:', error);
+        });
+
+      // Wallet connection
+      const connectWalletBtn = document.getElementById('connectWalletBtn');
+      const walletStatusText = document.getElementById('walletStatusText');
+      const walletStatusIcon = document.getElementById('walletStatusIcon');
+      const swapButton = document.getElementById('swapButton');
+      
+      // Test accounts from Hardhat
+      const testAccounts = [
+        { address: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266', name: 'Account #0 (Deployer)' },
+        { address: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8', name: 'Account #1' },
+        { address: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC', name: 'Account #2' },
+        { address: '0x90F79bf6EB2c4f870365E785982E1f101E93b906', name: 'Account #3' }
+      ];
+      
+      let connectedAccount = null;
+      
+      connectWalletBtn.addEventListener('click', function() {
+        if (connectedAccount) {
+          // Disconnect wallet
+          connectedAccount = null;
+          walletStatusText.textContent = 'Connect Wallet';
+          walletStatusIcon.textContent = '🔌';
+          swapButton.textContent = 'Connect Wallet to Swap';
+          document.getElementById('portfolioContainer').innerHTML = 
+            '<p>Connect your wallet to view your portfolio and token balances.</p>';
+        } else {
+          // Show wallet selection dialog
+          const accountsList = document.createElement('div');
+          accountsList.style.position = 'absolute';
+          accountsList.style.top = connectWalletBtn.getBoundingClientRect().bottom + 'px';
+          accountsList.style.right = (window.innerWidth - connectWalletBtn.getBoundingClientRect().right) + 'px';
+          accountsList.style.backgroundColor = '#fff';
+          accountsList.style.borderRadius = '4px';
+          accountsList.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+          accountsList.style.padding = '10px 0';
+          accountsList.style.zIndex = '1000';
+          
+          testAccounts.forEach(account => {
+            const accountOption = document.createElement('div');
+            accountOption.style.padding = '10px 20px';
+            accountOption.style.cursor = 'pointer';
+            accountOption.style.transition = 'background-color 0.3s';
+            accountOption.textContent = account.name;
+            accountOption.style.whiteSpace = 'nowrap';
+            
+            accountOption.addEventListener('mouseover', function() {
+              accountOption.style.backgroundColor = '#f7f9fc';
+            });
+            
+            accountOption.addEventListener('mouseout', function() {
+              accountOption.style.backgroundColor = 'transparent';
+            });
+            
+            accountOption.addEventListener('click', function() {
+              connectedAccount = account;
+              walletStatusText.textContent = account.address.substring(0, 6) + '...' + account.address.substring(38);
+              walletStatusIcon.textContent = '🔐';
+              swapButton.textContent = 'Swap Tokens';
+              document.body.removeChild(accountsList);
+              
+              // Load portfolio for connected account
+              loadPortfolio(account.address);
+            });
+            
+            accountsList.appendChild(accountOption);
+          });
+          
+          document.body.appendChild(accountsList);
+          
+          // Close when clicking outside
+          document.addEventListener('click', function closeDropdown(e) {
+            if (!accountsList.contains(e.target) && e.target !== connectWalletBtn) {
+              if (document.body.contains(accountsList)) {
+                document.body.removeChild(accountsList);
+              }
+              document.removeEventListener('click', closeDropdown);
+            }
+          });
+        }
+      });
+      
+      function loadPortfolio(address) {
+        const portfolioContainer = document.getElementById('portfolioContainer');
+        portfolioContainer.innerHTML = '<div class="loading-spinner"></div> Loading portfolio...';
+        
+        fetch(`/api/portfolio/${address}`)
+          .then(response => response.json())
+          .then(portfolio => {
+            if (portfolio.assets.length === 0) {
+              portfolioContainer.innerHTML = '<p>No assets found in this wallet.</p>';
+              return;
+            }
+            
+            portfolioContainer.innerHTML = `
+              <div class="card">
+                <h3>Portfolio Summary</h3>
+                <div class="balance-row">
+                  <div>Total Value:</div>
+                  <div class="token-value">$${portfolio.totalValue.toFixed(2)}</div>
+                </div>
+                <div class="balance-row">
+                  <div>Profit/Loss:</div>
+                  <div class="token-value" style="color: ${portfolio.totalProfitLoss >= 0 ? 'green' : 'red'}">
+                    $${portfolio.totalProfitLoss.toFixed(2)} (${portfolio.profitLossPercentage.toFixed(2)}%)
+                  </div>
+                </div>
+              </div>
+
+              <h3 style="margin-top: 20px;">Token Balances</h3>
+              <div class="card-grid">
+                ${portfolio.assets.map(asset => `
+                  <div class="card">
+                    <div class="token-info">
+                      <img src="${asset.token.logoUrl}" alt="${asset.token.symbol}" class="token-icon">
+                      <div>
+                        <h3>${asset.token.name} (${asset.token.symbol})</h3>
+                        <p>${asset.balance} ${asset.token.symbol}</p>
+                      </div>
+                    </div>
+                    <div class="balance-row" style="margin-top: 15px;">
+                      <div>Value:</div>
+                      <div class="token-value">$${asset.value.toFixed(2)}</div>
+                    </div>
+                    <div class="balance-row">
+                      <div>Profit/Loss:</div>
+                      <div class="token-value" style="color: ${asset.profit >= 0 ? 'green' : 'red'}">
+                        $${asset.profit.toFixed(2)} (${asset.profitPercentage.toFixed(2)}%)
+                      </div>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            `;
+          })
+          .catch(error => {
+            console.error('Error loading portfolio:', error);
+            portfolioContainer.innerHTML = '<p>Error loading portfolio data. Please try again.</p>';
+          });
+      }
+      
+      // Calculate swap amount
+      const fromAmount = document.getElementById('fromAmount');
+      const fromToken = document.getElementById('fromToken');
+      const toToken = document.getElementById('toToken');
+      const toAmount = document.getElementById('toAmount');
+      
+      function calculateSwapAmount() {
+        if (!fromAmount.value || parseFloat(fromAmount.value) === 0) {
+          toAmount.textContent = '0.0';
+          return;
+        }
+        
+        fetch('/api/prices')
+          .then(response => response.json())
+          .then(prices => {
+            const fromTokenId = parseInt(fromToken.value);
+            const toTokenId = parseInt(toToken.value);
+            
+            const fromPrice = prices.find(p => p.tokenId === fromTokenId)?.price || 0;
+            const toPrice = prices.find(p => p.tokenId === toTokenId)?.price || 0;
+            
+            if (fromPrice && toPrice) {
+              const rate = fromPrice / toPrice;
+              const amount = parseFloat(fromAmount.value) * rate;
+              toAmount.textContent = amount.toFixed(6);
+            } else {
+              toAmount.textContent = 'Price not available';
+            }
+          })
+          .catch(error => {
+            console.error('Error calculating swap amount:', error);
+            toAmount.textContent = 'Error calculating amount';
+          });
+      }
+      
+      fromAmount.addEventListener('input', calculateSwapAmount);
+      fromToken.addEventListener('change', calculateSwapAmount);
+      toToken.addEventListener('change', calculateSwapAmount);
+      
+      // Swap tokens
+      swapButton.addEventListener('click', function() {
+        if (!connectedAccount) {
+          connectWalletBtn.click();
+          return;
+        }
+        
+        if (!fromAmount.value || parseFloat(fromAmount.value) === 0) {
+          alert('Please enter an amount to swap');
+          return;
+        }
+        
+        const fromTokenId = parseInt(fromToken.value);
+        const toTokenId = parseInt(toToken.value);
+        
+        if (fromTokenId === toTokenId) {
+          alert('Cannot swap to the same token');
+          return;
+        }
+        
+        swapButton.textContent = 'Processing...';
+        swapButton.disabled = true;
+        
+        fetch('/api/swap', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            fromTokenId,
+            toTokenId,
+            amount: fromAmount.value,
+            walletAddress: connectedAccount.address
+          })
+        })
+          .then(response => response.json())
+          .then(data => {
+            alert(`Swap successful!\nYou swapped ${fromAmount.value} ${fromToken.options[fromToken.selectedIndex].text.split(' ')[0]} for ${data.transaction.toAmount} ${toToken.options[toToken.selectedIndex].text.split(' ')[0]}`);
+            
+            // Refresh portfolio
+            loadPortfolio(connectedAccount.address);
+            
+            // Reset form
+            fromAmount.value = '';
+            toAmount.textContent = '0.0';
+            swapButton.textContent = 'Swap Tokens';
+            swapButton.disabled = false;
+          })
+          .catch(error => {
+            console.error('Error executing swap:', error);
+            alert('Error executing swap. Please try again.');
+            swapButton.textContent = 'Swap Tokens';
+            swapButton.disabled = false;
+          });
+      });
+    });
+  </script>
 </body>
 </html>

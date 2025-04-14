@@ -6,46 +6,46 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title ERC20Mock
- * @dev Mock ERC20 token for testing purposes
+ * @dev Implementation of the ERC20 Token Standard for testing purposes.
  */
 contract ERC20Mock is ERC20, Ownable {
     uint8 private _decimals;
-    
+
     /**
-     * @dev Constructor
-     * @param name The name of the token
-     * @param symbol The symbol of the token
-     * @param tokenDecimals The number of decimals for the token
+     * @dev Constructor that gives the msg.sender all of existing tokens.
      */
     constructor(
         string memory name,
         string memory symbol,
-        uint8 tokenDecimals
-    ) ERC20(name, symbol) {
-        _decimals = tokenDecimals;
+        uint8 decimalsValue
+    ) ERC20(name, symbol) Ownable(msg.sender) {
+        _decimals = decimalsValue;
     }
-    
+
     /**
-     * @dev Returns the number of decimals used for user representation
+     * @dev Returns the number of decimals used to get its user representation.
      */
     function decimals() public view virtual override returns (uint8) {
         return _decimals;
     }
-    
+
     /**
-     * @dev Mint new tokens
-     * @param to The address to mint tokens to
-     * @param amount The amount of tokens to mint
+     * @dev Creates `amount` tokens and assigns them to `account`, increasing
+     * the total supply.
+     *
+     * Emits a {Transfer} event with `from` set to the zero address.
      */
-    function mint(address to, uint256 amount) external onlyOwner {
-        _mint(to, amount);
+    function mint(address account, uint256 amount) public onlyOwner {
+        _mint(account, amount);
     }
-    
+
     /**
-     * @dev Burn tokens
-     * @param amount The amount of tokens to burn
+     * @dev Destroys `amount` tokens from `account`, reducing the
+     * total supply.
+     *
+     * Emits a {Transfer} event with `to` set to the zero address.
      */
-    function burn(uint256 amount) external {
-        _burn(msg.sender, amount);
+    function burn(address account, uint256 amount) public onlyOwner {
+        _burn(account, amount);
     }
 }
