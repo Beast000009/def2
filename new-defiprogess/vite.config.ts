@@ -9,6 +9,26 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 export default defineConfig({
+  server: {
+    host: '0.0.0.0',
+    port: 5002,
+    cors: true,
+    hmr: {
+      host: 'localhost',
+      clientPort: 443,
+      protocol: 'wss'
+    },
+    watch: {
+      usePolling: true
+    },
+    proxy: {
+      '/api': {
+        target: 'http://0.0.0.0:5001',
+        changeOrigin: true,
+        secure: false
+      }
+    }
+  },
   plugins: [
     react(),
     runtimeErrorOverlay(),
