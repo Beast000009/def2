@@ -13,7 +13,7 @@ import { fromZodError } from "zod-validation-error";
 import axios from "axios";
 
 // CoinGecko API key (Pro)
-const COINGECKO_API_KEY = "CG-DabLio2kdoGa5MG2Pc7tqvNk";
+const COINGECKO_API_KEY = "CG-9MWn3BvMDdiaG3kkjY3urPcj";
 
 // Nomics API base URL and key
 const NOMICS_API_URL = "https://api.nomics.com/v1";
