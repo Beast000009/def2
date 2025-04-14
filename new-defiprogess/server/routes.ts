@@ -11,9 +11,45 @@ import {
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import axios from "axios";
+import { ethers } from "ethers";
+import fs from "fs";
+import path from "path";
 
 // CoinGecko API key (Pro)
 const COINGECKO_API_KEY = "CG-9MWn3BvMDdiaG3kkjY3urPcj";
+
+// TestToken address
+const TEST_TOKEN_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+
+// Function to get the real token balance from the blockchain
+const getTokenBalanceFromBlockchain = async (walletAddress: string, tokenAddress: string): Promise<string> => {
+  try {
+    // Connect to the Hardhat node
+    const provider = new ethers.JsonRpcProvider("http://127.0.0.1:8545");
+    
+    // ERC20 ABI (minimal)
+    const abi = [
+      "function balanceOf(address owner) view returns (uint256)",
+      "function decimals() view returns (uint8)"
+    ];
+    
+    const tokenContract = new ethers.Contract(tokenAddress, abi, provider);
+    
+    // Get token decimals
+    const decimals = await tokenContract.decimals();
+    
+    // Get balance
+    const balance = await tokenContract.balanceOf(walletAddress);
+    
+    // Format balance with proper decimals
+    const formattedBalance = ethers.formatUnits(balance, decimals);
+    
+    return formattedBalance;
+  } catch (error) {
+    console.error(`Error fetching token balance from blockchain:`, error);
+    return "0"; // Return 0 balance if there's an error
+  }
+};
 
 // Nomics API base URL and key
 const NOMICS_API_URL = "https://api.nomics.com/v1";
@@ -722,26 +758,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           walletAddress,
         });
 
-        // Create test balances with some demo data
+        // Create empty balances - no fake data
         const tokens = await storage.getAllTokens();
         
-        // Demo balances for common tokens
-        const demoBalances = {
-          'ETH': '0.5',
-          'BTC': '0.025',
-          'USDT': '1000',
-          'SOL': '10',
-          'MATIC': '100',
-          'LINK': '25',
-          'UNI': '15'
-        };
-        
         for (const token of tokens) {
-          const balance = demoBalances[token.symbol] || '0';
+          // For TEST token on testnet, we could query balance from the contract
+          // But for now we'll just set to '0' and rely on blockchain calls
           await storage.createOrUpdateUserBalance({
             userId: user.id,
             tokenId: token.id,
-            balance: balance,
+            balance: '0',
           });
         }
       }
@@ -758,6 +784,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
           );
 
           if (!token || !tokenPrice) return null;
+          
+          // Get token balance - for TEST token, use actual blockchain data
+          let tokenBalance = balance.balance;
+          
+          try {
+            if (token.symbol === "TEST" && token.contractAddress) {
+              // Get real TEST token balance from blockchain
+              const realBalance = await getTokenBalanceFromBlockchain(walletAddress, TEST_TOKEN_ADDRESS);
+              console.log(`Real TEST balance for ${walletAddress}: ${realBalance}`);
+              
+              // Update stored balance if it's different (for future reference)
+              if (realBalance !== balance.balance) {
+                await storage.createOrUpdateUserBalance({
+                  userId: user.id,
+                  tokenId: token.id,
+                  balance: realBalance
+                });
+                tokenBalance = realBalance;
+              }
+            }
+          } catch (blockchainError) {
+            console.error("Error fetching blockchain balance:", blockchainError);
+            // Continue with stored balance if blockchain call fails
+          }
 
           // Try to get real-time price from CoinGecko
           try {
@@ -772,8 +822,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 name: token.name,
                 logoUrl: token.logoUrl,
               },
-              balance: balance.balance,
-              value: (parseFloat(balance.balance) * parseFloat(price)).toFixed(
+              balance: tokenBalance,
+              value: (parseFloat(tokenBalance) * parseFloat(price)).toFixed(
                 2,
               ),
               price: price,
@@ -790,9 +840,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 name: token.name,
                 logoUrl: token.logoUrl,
               },
-              balance: balance.balance,
+              balance: tokenBalance,
               value: (
-                parseFloat(balance.balance) * parseFloat(tokenPrice.price)
+                parseFloat(tokenBalance) * parseFloat(tokenPrice.price)
               ).toFixed(2),
               price: tokenPrice.price,
               priceChange24h: tokenPrice.priceChange24h || "0",
