@@ -16,7 +16,7 @@ import {
 import { useWeb3 } from '@/lib/web3';
 import { useToast } from '@/hooks/use-toast';
 import { queryClient } from '@/lib/queryClient';
-import { ArrowDownUp, Loader2 } from 'lucide-react';
+import { ArrowDownUp, Loader2, AlertCircle } from 'lucide-react';
 
 const SwapInterface = () => {
   const [fromTokenId, setFromTokenId] = useState<number | undefined>();
@@ -103,9 +103,21 @@ const SwapInterface = () => {
       return;
     }
 
-    const exchangeRate = toPrice / fromPrice;
-    const calculatedAmount = parseFloat(fromAmount) * exchangeRate;
-    setToAmount(isNaN(calculatedAmount) ? '' : calculatedAmount.toString());
+    // Exchange rate should be fromPrice/toPrice for correct calculation
+    // This means: how many toTokens you get for 1 fromToken
+    const exchangeRate = fromPrice / toPrice;
+    const fromAmountValue = parseFloat(fromAmount);
+    
+    if (isNaN(fromAmountValue)) {
+      setToAmount('');
+      return;
+    }
+    
+    const calculatedAmount = fromAmountValue * exchangeRate;
+    
+    // Format the result to a reasonable number of decimal places
+    const decimals = toTokenId === 13 ? 10 : 8; // Higher precision for very small values like SHIB
+    setToAmount(calculatedAmount.toFixed(decimals));
   };
 
   // Event handlers
@@ -159,6 +171,28 @@ const SwapInterface = () => {
       });
       return;
     }
+    
+    // Check if user has sufficient balance
+    const fromTokenBalanceNum = parseFloat(fromTokenBalance);
+    const fromAmountNum = parseFloat(fromAmount);
+    
+    if (isNaN(fromTokenBalanceNum) || isNaN(fromAmountNum)) {
+      toast({
+        title: 'Error',
+        description: 'Invalid amount format',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    if (fromAmountNum > fromTokenBalanceNum) {
+      toast({
+        title: 'Insufficient Balance',
+        description: `You only have ${fromTokenBalance} ${fromToken?.symbol} available`,
+        variant: 'destructive'
+      });
+      return;
+    }
 
     swapMutation.mutate({
       fromTokenId,
@@ -198,11 +232,30 @@ const SwapInterface = () => {
     return asset ? asset.balance : '0';
   })();
   
+  // Calculate rate in proper direction (fromToken to toToken)
+  const calculateRate = () => {
+    if (!fromTokenId || !toTokenId || !tokenPrices) return "0";
+    
+    const fromTokenPrice = getTokenPrice(fromTokenId);
+    const toTokenPrice = getTokenPrice(toTokenId);
+    
+    if (!fromTokenPrice || !toTokenPrice) return "0";
+    
+    // Rate is toTokenPrice / fromTokenPrice (how many toTokens you get for 1 fromToken)
+    const calculatedRate = fromTokenPrice / toTokenPrice;
+    return calculatedRate.toFixed(10);
+  };
+  
+  // This is the correct displayed rate
+  const displayRate = calculateRate();
+  
   return (
-    <div className="p-4">
-      <div className="mb-4">
+    <div className="p-4 max-w-md mx-auto">
+      <div className="mb-6 bg-neutral-800 border border-neutral-700 rounded-xl p-5 shadow-lg">
+        <h2 className="text-xl font-semibold mb-4 text-center">Swap Tokens</h2>
+        
         {/* From Token Section */}
-        <div className="bg-neutral-700 rounded-xl p-4 mb-2">
+        <div className="bg-neutral-700 rounded-xl p-4 mb-3">
           <div className="flex items-center justify-between mb-2">
             <label className="text-sm text-neutral-400">You Pay</label>
             <div className="text-sm text-neutral-400">
@@ -230,7 +283,7 @@ const SwapInterface = () => {
               {fromAmount && fromTokenId ? formatUsdValue(fromTokenUsdValue) : '$0.00'}
             </span>
             <button 
-              className="text-primary-light hover:underline"
+              className="text-blue-400 hover:text-blue-300 hover:underline"
               onClick={handleMaxClick}
             >
               Max
@@ -241,15 +294,15 @@ const SwapInterface = () => {
         {/* Swap Button */}
         <div className="flex justify-center -my-3 relative z-10">
           <button 
-            className="w-10 h-10 rounded-full bg-neutral-700 hover:bg-neutral-600 border border-neutral-600 flex items-center justify-center transition-colors"
+            className="w-10 h-10 rounded-full bg-blue-600 hover:bg-blue-500 border border-blue-500 flex items-center justify-center transition-colors shadow-md"
             onClick={handleSwapTokens}
           >
-            <ArrowDownUp className="h-4 w-4 text-neutral-300" />
+            <ArrowDownUp className="h-4 w-4 text-white" />
           </button>
         </div>
         
         {/* To Token Section */}
-        <div className="bg-neutral-700 rounded-xl p-4 mb-4">
+        <div className="bg-neutral-700 rounded-xl p-4 mt-2 mb-4">
           <div className="flex items-center justify-between mb-2">
             <label className="text-sm text-neutral-400">You Receive</label>
             <div className="text-sm text-neutral-400">
@@ -276,41 +329,55 @@ const SwapInterface = () => {
             {toAmount && toTokenId ? formatUsdValue(toTokenUsdValue) : '$0.00'}
           </div>
         </div>
+        
+        {/* Swap Details */}
+        {fromTokenId && toTokenId && fromAmount && parseFloat(fromAmount) > 0 && (
+          <div className="bg-neutral-900 rounded-lg p-4 mb-5 border border-neutral-800">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-neutral-400">Rate</span>
+              <span className="text-sm">
+                1 {fromToken?.symbol} = {displayRate} {toToken?.symbol}
+              </span>
+            </div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-neutral-400">Price Impact</span>
+              <span className="text-sm text-green-400">0.05%</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-neutral-400">Network Fee</span>
+              <span className="text-sm">{isConnected ? '$12.34' : '—'}</span>
+            </div>
+          </div>
+        )}
+        
+        {/* Insufficient Balance Warning */}
+        {isConnected && fromTokenId && fromAmount && parseFloat(fromAmount) > parseFloat(fromTokenBalance) && (
+          <div className="bg-red-900 bg-opacity-30 border border-red-800 rounded-lg p-3 mb-4 flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 text-red-400" />
+            <div className="text-sm text-red-300">
+              Insufficient balance. You only have {fromTokenBalance} {fromToken?.symbol} available.
+            </div>
+          </div>
+        )}
+        
+        {/* Swap Button */}
+        <Button 
+          className="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-4 px-6 rounded-lg transition-colors shadow-md"
+          onClick={handleSwap}
+          disabled={swapMutation.isPending || !fromAmount || !fromTokenId || !toTokenId || parseFloat(fromAmount) <= 0 || (isConnected && parseFloat(fromAmount) > parseFloat(fromTokenBalance))}
+        >
+          {swapMutation.isPending ? (
+            <div className="flex items-center justify-center">
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" /> 
+              Swapping...
+            </div>
+          ) : isConnected ? 
+            parseFloat(fromAmount) > parseFloat(fromTokenBalance) ? 
+              'Insufficient Balance' : 
+              'Swap Tokens' 
+            : 'Connect Wallet to Swap'}
+        </Button>
       </div>
-      
-      {/* Swap Details */}
-      {fromTokenId && toTokenId && fromAmount && parseFloat(fromAmount) > 0 && (
-        <div className="bg-neutral-700 bg-opacity-50 rounded-lg p-3 mb-4">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-sm text-neutral-400">Rate</span>
-            <span className="text-sm">
-              1 {fromToken?.symbol} = {formatTokenAmount(rate)} {toToken?.symbol}
-            </span>
-          </div>
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-sm text-neutral-400">Price Impact</span>
-            <span className="text-sm text-success">0.05%</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-neutral-400">Network Fee</span>
-            <span className="text-sm">$12.34</span>
-          </div>
-        </div>
-      )}
-      
-      {/* Swap Button */}
-      <Button 
-        className="w-full bg-primary hover:bg-primary-dark text-white font-medium py-3 px-4 rounded-lg transition-colors"
-        onClick={handleSwap}
-        disabled={swapMutation.isPending || !fromAmount || !fromTokenId || !toTokenId || parseFloat(fromAmount) <= 0}
-      >
-        {swapMutation.isPending ? (
-          <div className="flex items-center">
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 
-            Swapping...
-          </div>
-        ) : isConnected ? 'Swap Tokens' : 'Connect Wallet to Swap'}
-      </Button>
     </div>
   );
 };
