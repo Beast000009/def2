@@ -67,6 +67,7 @@ export class MemStorage implements IStorage {
   private initializeDefaultTokens() {
     const defaultTokens: InsertToken[] = [
       { symbol: "ETH", name: "Ethereum", logoUrl: "https://cryptologos.cc/logos/ethereum-eth-logo.svg", decimals: 18, contractAddress: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE", network: "ethereum" },
+      { symbol: "TEST", name: "Test Token", logoUrl: "https://cryptologos.cc/logos/chainlink-link-logo.svg", decimals: 18, contractAddress: "0x5FbDB2315678afecb367f032d93F642f64180aa3", network: "ethereum" },
       { symbol: "BTC", name: "Bitcoin", logoUrl: "https://cryptologos.cc/logos/bitcoin-btc-logo.svg", decimals: 8, contractAddress: "0x", network: "bitcoin" },
       { symbol: "USDT", name: "Tether", logoUrl: "https://cryptologos.cc/logos/tether-usdt-logo.svg", decimals: 6, contractAddress: "0xdAC17F958D2ee523a2206206994597C13D831ec7", network: "ethereum" },
       { symbol: "SOL", name: "Solana", logoUrl: "https://cryptologos.cc/logos/solana-sol-logo.svg", decimals: 9, contractAddress: "0x", network: "solana" },
@@ -93,25 +94,25 @@ export class MemStorage implements IStorage {
     // Add default token prices
     const defaultPrices: InsertTokenPrice[] = [
       { tokenId: 1, price: "3245.67", priceChange24h: "2.45", volume24h: "1000000000", marketCap: "389452000000" },
-      { tokenId: 2, price: "44782.09", priceChange24h: "1.87", volume24h: "2500000000", marketCap: "875300000000" },
-      { tokenId: 3, price: "1.00", priceChange24h: "0.01", volume24h: "5000000000", marketCap: "96500000000" },
-      { tokenId: 4, price: "98.34", priceChange24h: "-0.65", volume24h: "750000000", marketCap: "41232400000" },
-      { tokenId: 5, price: "0.4523", priceChange24h: "3.12", volume24h: "300000000", marketCap: "15987300000" },
-      { tokenId: 6, price: "0.5643", priceChange24h: "1.23", volume24h: "430000000", marketCap: "30254800000" },
-      { tokenId: 7, price: "6.85", priceChange24h: "-2.11", volume24h: "140000000", marketCap: "8453900000" },
-      { tokenId: 8, price: "0.1234", priceChange24h: "5.67", volume24h: "560000000", marketCap: "17432500000" },
-      { tokenId: 9, price: "34.56", priceChange24h: "-0.98", volume24h: "190000000", marketCap: "11987600000" },
-      { tokenId: 10, price: "5.43", priceChange24h: "1.45", volume24h: "210000000", marketCap: "3987200000" },
-      { tokenId: 11, price: "1.25", priceChange24h: "3.56", volume24h: "320000000", marketCap: "11145800000" },
-      { tokenId: 12, price: "14.76", priceChange24h: "-1.54", volume24h: "180000000", marketCap: "7643500000" },
-      { tokenId: 13, price: "0.00002145", priceChange24h: "7.89", volume24h: "450000000", marketCap: "12543900000" },
-      { tokenId: 14, price: "76.34", priceChange24h: "0.75", volume24h: "110000000", marketCap: "5632100000" },
-      { tokenId: 15, price: "9.87", priceChange24h: "2.34", volume24h: "130000000", marketCap: "2876500000" },
-      { tokenId: 16, price: "0.13", priceChange24h: "-0.43", volume24h: "45000000", marketCap: "3457800000" },
-      { tokenId: 17, price: "5.67", priceChange24h: "1.08", volume24h: "75000000", marketCap: "1143500000" },
-      { tokenId: 18, price: "89.32", priceChange24h: "-3.21", volume24h: "35000000", marketCap: "1435600000" },
-      { tokenId: 19, price: "0.15", priceChange24h: "2.76", volume24h: "60000000", marketCap: "1067400000" },
-      { tokenId: 20, price: "2.34", priceChange24h: "4.32", volume24h: "85000000", marketCap: "986500000" },
+      { tokenId: 2, price: "5.25", priceChange24h: "3.75", volume24h: "15000000", marketCap: "5250000" },
+      { tokenId: 3, price: "44782.09", priceChange24h: "1.87", volume24h: "2500000000", marketCap: "875300000000" },
+      { tokenId: 4, price: "1.00", priceChange24h: "0.01", volume24h: "5000000000", marketCap: "96500000000" },
+      { tokenId: 5, price: "98.34", priceChange24h: "-0.65", volume24h: "750000000", marketCap: "41232400000" },
+      { tokenId: 6, price: "0.4523", priceChange24h: "3.12", volume24h: "300000000", marketCap: "15987300000" },
+      { tokenId: 7, price: "0.5643", priceChange24h: "1.23", volume24h: "430000000", marketCap: "30254800000" },
+      { tokenId: 8, price: "6.85", priceChange24h: "-2.11", volume24h: "140000000", marketCap: "8453900000" },
+      { tokenId: 9, price: "0.1234", priceChange24h: "5.67", volume24h: "560000000", marketCap: "17432500000" },
+      { tokenId: 10, price: "34.56", priceChange24h: "-0.98", volume24h: "190000000", marketCap: "11987600000" },
+      { tokenId: 11, price: "5.43", priceChange24h: "1.45", volume24h: "210000000", marketCap: "3987200000" },
+      { tokenId: 12, price: "1.25", priceChange24h: "3.56", volume24h: "320000000", marketCap: "11145800000" },
+      { tokenId: 13, price: "14.76", priceChange24h: "-1.54", volume24h: "180000000", marketCap: "7643500000" },
+      { tokenId: 14, price: "0.00002145", priceChange24h: "7.89", volume24h: "450000000", marketCap: "12543900000" },
+      { tokenId: 15, price: "76.34", priceChange24h: "0.75", volume24h: "110000000", marketCap: "5632100000" },
+      { tokenId: 16, price: "9.87", priceChange24h: "2.34", volume24h: "130000000", marketCap: "2876500000" },
+      { tokenId: 17, price: "0.13", priceChange24h: "-0.43", volume24h: "45000000", marketCap: "3457800000" },
+      { tokenId: 18, price: "5.67", priceChange24h: "1.08", volume24h: "75000000", marketCap: "1143500000" },
+      { tokenId: 19, price: "89.32", priceChange24h: "-3.21", volume24h: "35000000", marketCap: "1435600000" },
+      { tokenId: 20, price: "0.15", priceChange24h: "2.76", volume24h: "60000000", marketCap: "1067400000" }
     ];
     
     defaultPrices.forEach(price => this.createOrUpdateTokenPrice(price));
