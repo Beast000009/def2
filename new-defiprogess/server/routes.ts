@@ -722,13 +722,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           walletAddress,
         });
 
-        // Create empty balances
+        // Create test balances with some demo data
         const tokens = await storage.getAllTokens();
+        
+        // Demo balances for common tokens
+        const demoBalances = {
+          'ETH': '0.5',
+          'BTC': '0.025',
+          'USDT': '1000',
+          'SOL': '10',
+          'MATIC': '100',
+          'LINK': '25',
+          'UNI': '15'
+        };
+        
         for (const token of tokens) {
+          const balance = demoBalances[token.symbol] || '0';
           await storage.createOrUpdateUserBalance({
             userId: user.id,
             tokenId: token.id,
-            balance: "0",
+            balance: balance,
           });
         }
       }

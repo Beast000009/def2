@@ -246,9 +246,15 @@ export const executeTrade = async (params: TradeParams): Promise<TradeResponse> 
 export const formatTokenAmount = (amount: string | number, decimals = 6): string => {
   const num = typeof amount === 'string' ? parseFloat(amount) : amount;
   if (isNaN(num)) return '0';
+  
+  // Handle zero or extremely small values better
+  if (num === 0 || Math.abs(num) < 1e-10) {
+    return '0';
+  }
 
   if (num < 0.000001) {
-    return num.toExponential(2);
+    // Handle very small numbers in a more readable way
+    return num.toFixed(8);
   }
 
   if (num < 0.01) {
