@@ -1,5 +1,5 @@
 // Test script to interact with the API for swap and spot trading
-const axios = require('axios');
+import axios from 'axios';
 
 // Test account (use one from the Hardhat accounts)
 const WALLET_ADDRESS = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'; // Account #1
@@ -87,4 +87,7 @@ async function testAPI() {
 }
 
 // Run the tests
-testAPI();
+testAPI()
+  .catch(error => {
+    console.error('Error in test script:', error);
+  });
