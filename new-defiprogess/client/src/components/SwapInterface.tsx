@@ -3,6 +3,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import TokenSelector from './TokenSelector';
+import { ethers } from 'ethers';
 import { 
   fetchTokens, 
   fetchTokenPrices, 
@@ -23,7 +24,7 @@ const SwapInterface = () => {
   const [toTokenId, setToTokenId] = useState<number | undefined>();
   const [fromAmount, setFromAmount] = useState<string>('');
   const [toAmount, setToAmount] = useState<string>('');
-  const { address, isConnected } = useWeb3();
+  const { address, isConnected, provider } = useWeb3();
   const { toast } = useToast();
 
   // Data queries
@@ -220,17 +221,98 @@ const SwapInterface = () => {
   const rate = fromTokenId && toTokenId ? 
     getTokenPrice(toTokenId)! / getTokenPrice(fromTokenId)! : 0;
   
-  const fromTokenBalance = (() => {
-    if (!isConnected || !portfolio?.assets || !fromTokenId) return '0';
-    const asset = portfolio.assets.find((a: PortfolioAsset) => a.token.id === fromTokenId);
-    return asset ? asset.balance : '0';
-  })();
+  // Enhanced balance calculation that uses both API and direct blockchain queries
+  const [fromTokenBalance, setFromTokenBalance] = useState('0');
+  const [toTokenBalance, setToTokenBalance] = useState('0');
   
-  const toTokenBalance = (() => {
-    if (!isConnected || !portfolio?.assets || !toTokenId) return '0';
-    const asset = portfolio.assets.find((a: PortfolioAsset) => a.token.id === toTokenId);
-    return asset ? asset.balance : '0';
-  })();
+  // Effect to update balances from both API and direct blockchain when needed
+  useEffect(() => {
+    async function updateBalances() {
+      if (!isConnected || !fromTokenId) {
+        setFromTokenBalance('0');
+        return;
+      }
+      
+      // First try to get balance from portfolio API
+      if (portfolio?.assets) {
+        const asset = portfolio.assets.find((a: PortfolioAsset) => a.token.id === fromTokenId);
+        if (asset && asset.balance !== '0') {
+          setFromTokenBalance(asset.balance);
+        }
+      }
+      
+      // If connected via direct RPC, also query blockchain
+      if (provider && address && fromToken) {
+        try {
+          // For ETH, get native balance
+          if (fromToken.symbol === 'ETH') {
+            const balance = await provider.getBalance(address);
+            const formattedBalance = ethers.formatEther(balance);
+            setFromTokenBalance(formattedBalance);
+            console.log(`Direct ETH balance: ${formattedBalance}`);
+          } 
+          // For tokens, get ERC20 balance if contract address is available
+          else if (fromToken.contractAddress && fromToken.contractAddress !== '0x') {
+            const tokenContract = new ethers.Contract(
+              fromToken.contractAddress,
+              ["function balanceOf(address) view returns (uint256)"],
+              provider
+            );
+            const balance = await tokenContract.balanceOf(address);
+            const decimals = fromToken.decimals || 18;
+            const formattedBalance = ethers.formatUnits(balance, decimals);
+            setFromTokenBalance(formattedBalance);
+            console.log(`Direct token balance for ${fromToken.symbol}: ${formattedBalance}`);
+          }
+        } catch (error) {
+          console.error("Error fetching blockchain balance:", error);
+        }
+      }
+    }
+    
+    updateBalances();
+  }, [isConnected, fromTokenId, address, provider, portfolio]);
+  
+  // Same for toToken
+  useEffect(() => {
+    async function updateToTokenBalance() {
+      if (!isConnected || !toTokenId) {
+        setToTokenBalance('0');
+        return;
+      }
+      
+      // Try portfolio API first
+      if (portfolio?.assets) {
+        const asset = portfolio.assets.find((a: PortfolioAsset) => a.token.id === toTokenId);
+        if (asset && asset.balance !== '0') {
+          setToTokenBalance(asset.balance);
+        }
+      }
+      
+      // Query blockchain if needed
+      if (provider && address && toToken) {
+        try {
+          if (toToken.symbol === 'ETH') {
+            const balance = await provider.getBalance(address);
+            setToTokenBalance(ethers.formatEther(balance));
+          } else if (toToken.contractAddress && toToken.contractAddress !== '0x') {
+            const tokenContract = new ethers.Contract(
+              toToken.contractAddress,
+              ["function balanceOf(address) view returns (uint256)"],
+              provider
+            );
+            const balance = await tokenContract.balanceOf(address);
+            const decimals = toToken.decimals || 18;
+            setToTokenBalance(ethers.formatUnits(balance, decimals));
+          }
+        } catch (error) {
+          console.error("Error fetching to-token blockchain balance:", error);
+        }
+      }
+    }
+    
+    updateToTokenBalance();
+  }, [isConnected, toTokenId, address, provider, portfolio]);
   
   // Calculate rate in proper direction (fromToken to toToken)
   const calculateRate = () => {
