@@ -19,6 +19,18 @@ args = "CloneAndRunScript"
 task = "workflow.run"
 args = "DefiProject"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "DefiBlockchain"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "DefiServer"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "HardhatNode"
+
 [[workflows.workflow]]
 name = "CloneAndRunScript"
 author = "agent"
@@ -48,9 +60,58 @@ task = "shell.exec"
 args = "cd defiprogess && npx tsx server/index.ts"
 waitForPort = 5000
 
+[[workflows.workflow]]
+name = "DefiBlockchain"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd defiprogess && npm run blockchain"
+waitForPort = 5000
+
+[[workflows.workflow]]
+name = "DefiServer"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd defiprogess && npm run dev"
+waitForPort = 5000
+
+[[workflows.workflow]]
+name = "HardhatNode"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd defiprogess/contracts && npx hardhat node"
+waitForPort = 8545
+
 [deployment]
 run = ["sh", "-c", "python clone_and_run.py"]
 
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 8545
+externalPort = 3000
