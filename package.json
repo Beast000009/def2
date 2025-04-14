@@ -17,6 +17,7 @@
     "@replit/vite-plugin-cartographer": "^0.0.11",
     "@replit/vite-plugin-runtime-error-modal": "^0.0.3",
     "@replit/vite-plugin-shadcn-theme-json": "^0.0.4",
+    "@tailwindcss/postcss": "^4.1.4",
     "@types/cors": "^2.8.17",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.21",
