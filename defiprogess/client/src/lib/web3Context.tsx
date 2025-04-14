@@ -10,9 +10,12 @@ declare global {
   }
 }
 
+// Define a provider type that can be either BrowserProvider or JsonRpcProvider
+type EthProvider = ethers.BrowserProvider | ethers.JsonRpcProvider;
+
 // Context type definition
 interface Web3ContextType {
-  provider: ethers.BrowserProvider | null;
+  provider: EthProvider | null;
   signer: ethers.JsonRpcSigner | null;
   address: string | null;
   chainId: number | null;
@@ -52,7 +55,7 @@ interface Web3ProviderProps {
 
 // Provider component
 export function Web3Provider({ children }: Web3ProviderProps) {
-  const [provider, setProvider] = useState<ethers.BrowserProvider | null>(null);
+  const [provider, setProvider] = useState<EthProvider | null>(null);
   const [signer, setSigner] = useState<ethers.JsonRpcSigner | null>(null);
   const [address, setAddress] = useState<string | null>(null);
   const [chainId, setChainId] = useState<number | null>(null);
@@ -62,24 +65,42 @@ export function Web3Provider({ children }: Web3ProviderProps) {
   const { toast } = useToast();
 
   const connectWallet = async (providerType = 'metamask') => {
-    if (!window.ethereum) {
-      toast({
-        title: "Wallet Error",
-        description: "No Ethereum wallet found. Please install MetaMask or another wallet.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     try {
       setIsConnecting(true);
+      let browserProvider;
+      let ethSigner;
 
-      // Request account access
-      const browserProvider = new ethers.BrowserProvider(window.ethereum);
-      await browserProvider.send("eth_requestAccounts", []);
+      if (providerType === 'local') {
+        // Connect directly to local Hardhat node
+        const localRpcUrl = "http://localhost:8545";
+        console.log("Connecting to local Hardhat node at:", localRpcUrl);
+        
+        const jsonRpcProvider = new ethers.JsonRpcProvider(localRpcUrl);
+        // Get the first account from local node
+        const accounts = await jsonRpcProvider.listAccounts();
+        if (accounts.length === 0) {
+          throw new Error("No accounts available on the local Hardhat node");
+        }
+        
+        browserProvider = jsonRpcProvider;
+        // Use the first account (index 0) as our signer
+        ethSigner = await jsonRpcProvider.getSigner(0);
+        
+      } else if (window.ethereum) {
+        // Connect using MetaMask or another injected provider
+        browserProvider = new ethers.BrowserProvider(window.ethereum);
+        await browserProvider.send("eth_requestAccounts", []);
+        ethSigner = await browserProvider.getSigner();
+      } else {
+        toast({
+          title: "Wallet Error",
+          description: "No Ethereum wallet found. Please install MetaMask or another wallet.",
+          variant: "destructive",
+        });
+        return;
+      }
 
       // Get signer and address
-      const ethSigner = await browserProvider.getSigner();
       const signerAddress = await ethSigner.getAddress();
       const network = await browserProvider.getNetwork();
       const networkChainId = Number(network.chainId);

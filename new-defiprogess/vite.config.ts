@@ -11,7 +11,7 @@ const __dirname = dirname(__filename);
 export default defineConfig({
   server: {
     host: '0.0.0.0',
-    port: 5002,
+    port: 5000,
     cors: true,
     hmr: {
       host: 'localhost',

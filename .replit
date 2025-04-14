@@ -4,7 +4,7 @@ modules = ["python-3.11", "nodejs-20"]
 channel = "stable-24_05"
 
 [workflows]
-runButton = "NewUI"
+runButton = "Project"
 
 [[workflows.workflow]]
 name = "Project"
@@ -17,35 +17,11 @@ args = "HardhatNode"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "DirectServer"
+args = "FrontendUI"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "SimpleServer"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "BlockchainServer"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "ViteClient"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Client Dev"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "MainUI"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "NewAPI"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "NewUI"
+args = "BackendAPI"
 
 [[workflows.workflow]]
 name = "HardhatNode"
@@ -62,7 +38,7 @@ task = "shell.exec"
 args = "cd defiprogess/contracts && npx hardhat node"
 
 [[workflows.workflow]]
-name = "DirectServer"
+name = "FrontendUI"
 author = "agent"
 
 [workflows.workflow.metadata]
@@ -73,11 +49,11 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd defiprogess && node direct-server.cjs"
+args = "cd new-defiprogess && npx vite --host 0.0.0.0 --port 5000"
 waitForPort = 5000
 
 [[workflows.workflow]]
-name = "SimpleServer"
+name = "BackendAPI"
 author = "agent"
 
 [workflows.workflow.metadata]
@@ -88,98 +64,8 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd defiprogess && npm i && npx vite --port 5174"
-waitForPort = 5174
-
-[[workflows.workflow]]
-name = "BlockchainServer"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd defiprogess && node blockchain-server.cjs"
-waitForPort = 5000
-
-[[workflows.workflow]]
-name = "ViteClient"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd defiprogess/client && npm i && npx vite --port 5174 --host 0.0.0.0"
-waitForPort = 5174
-
-[[workflows.workflow]]
-name = "Client Dev"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd defiprogess && npx vite"
-waitForPort = 5173
-
-[[workflows.workflow]]
-name = "MainUI"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd defiprogess && npm i && npx vite --host 0.0.0.0 --port 5175"
-waitForPort = 5175
-
-[[workflows.workflow]]
-name = "NewAPI"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd new-defiprogess && npm i && npm run dev"
+args = "cd new-defiprogess && npm run dev"
 waitForPort = 5001
-
-[[workflows.workflow]]
-name = "NewUI"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd new-defiprogess && npx vite --host 0.0.0.0 --port 5002"
-waitForPort = 5002
 
 [deployment]
 run = ["sh", "-c", "python clone_and_run.py"]
@@ -207,6 +93,10 @@ externalPort = 3002
 [[ports]]
 localPort = 5175
 externalPort = 3003
+
+[[ports]]
+localPort = 5176
+externalPort = 6000
 
 [[ports]]
 localPort = 8545
