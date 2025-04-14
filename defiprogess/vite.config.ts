@@ -33,4 +33,34 @@ export default defineConfig({
     outDir: path.resolve(__dirname, "dist/public"),
     emptyOutDir: true,
   },
+  server: {
+    host: '0.0.0.0',
+    port: 5000,
+    strictPort: true,
+    cors: {
+      origin: '*',
+    },
+    hmr: {
+      clientPort: 443,
+    },
+    fs: {
+      strict: false,
+      allow: ['..']
+    },
+    watch: {
+      usePolling: true
+    },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true
+      }
+    },
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
+      'Access-Control-Allow-Headers': 'X-Requested-With, content-type, Authorization'
+    },
+    allowedHosts: ['localhost', '.replit.dev', '.repl.co', '.replit.app', 'replit.com']
+  },
 });

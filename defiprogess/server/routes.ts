@@ -1,974 +1,274 @@
-import type { Express, Request, Response } from "express";
-import { createServer, type Server } from "http";
-import { storage } from "./storage";
-import {
-  insertUserSchema,
-  swapTokensSchema,
-  spotTradeSchema,
-  insertUserBalanceSchema,
-  insertTransactionSchema,
-} from "@shared/schema";
-import { ZodError } from "zod";
-import { fromZodError } from "zod-validation-error";
-import axios from "axios";
+import { Express, Request, Response, Router } from 'express';
+import { Server } from 'http';
+import { ethers } from 'ethers';
+import fs from 'fs';
+import path from 'path';
+import { swapTokensSchema, spotTradeSchema } from '../shared/schema';
 
-// CoinGecko API key (Pro)
-const COINGECKO_API_KEY = "CG-DabLio2kdoGa5MG2Pc7tqvNk";
+// Connect to local Hardhat node
+const provider = new ethers.JsonRpcProvider('http://0.0.0.0:8545/');
 
-// Nomics API base URL and key
-const NOMICS_API_URL = "https://api.nomics.com/v1";
-const NOMICS_API_KEY = process.env.NOMICS_API_KEY || "";
+// Use first account as admin
+const ADMIN_PRIVATE_KEY = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
+const adminWallet = new ethers.Wallet(ADMIN_PRIVATE_KEY, provider);
 
-// Function to build URL with API key
-const buildApiUrl = (endpoint: string) =>
-  `${NOMICS_API_URL}/${endpoint}?key=${NOMICS_API_KEY}`;
+// Contract ABIs
+const ERC20_ABI = [
+  "function approve(address spender, uint256 amount) returns (bool)",
+  "function allowance(address owner, address spender) view returns (uint256)",
+  "function balanceOf(address account) view returns (uint256)",
+  "function transfer(address recipient, uint256 amount) returns (bool)",
+  "function decimals() view returns (uint8)",
+  "function symbol() view returns (string)",
+  "function name() view returns (string)",
+  "function mint(address to, uint256 amount)",
+];
 
-// Mock Nomics call (for illustration purposes)
-const getTokenPriceWithNomics = async (tokenSymbol: string) => {
-  const fakeData = {
-    price: "123.45",
-    priceChange24h: "5.67",
-    volume24h: "7890.12",
-    marketCap: "345678901.23",
-  };
-  return fakeData;
+const TOKEN_SWAP_ABI = [
+  // View Functions
+  "function getSwapAmount(address fromToken, address toToken, uint256 fromAmount) view returns (uint256)",
+  "function supportedTokens(address token) view returns (bool)",
+  "function exchangeRates(address fromToken, address toToken) view returns (uint256)",
+  "function feePercentage() view returns (uint256)",
+  
+  // State Changing Functions
+  "function swap(address fromToken, address toToken, uint256 fromAmount, uint256 minToAmount, uint256 deadline) returns (uint256)",
+  
+  // Events
+  "event SwapExecuted(address indexed user, address indexed fromToken, address indexed toToken, uint256 fromAmount, uint256 toAmount, uint256 timestamp)",
+];
+
+const SPOT_TRADING_ABI = [
+  // View Functions
+  "function getOrder(uint256 orderId) view returns (tuple(uint256 id, address trader, address tokenAddress, address baseTokenAddress, uint256 amount, uint256 price, uint256 filled, uint256 timestamp, bool isBuyOrder, bool isActive))",
+  "function getActiveBuyOrders(address tokenAddress) view returns (uint256[])",
+  "function getActiveSellOrders(address tokenAddress) view returns (uint256[])",
+  "function get24HourVolume(address tokenAddress, address baseTokenAddress) view returns (uint256)",
+  
+  // State Changing Functions
+  "function createBuyOrder(address tokenAddress, address baseTokenAddress, uint256 amount, uint256 price) returns (uint256)",
+  "function createSellOrder(address tokenAddress, address baseTokenAddress, uint256 amount, uint256 price) returns (uint256)",
+  "function cancelOrder(uint256 orderId)",
+];
+
+// Contract addresses
+const CONTRACT_ADDRESSES = {
+  TOKEN_SWAP: "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+  SPOT_TRADING: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+  ETH: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0", 
+  USDT: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+  BTC: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+  LINK: "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707",
 };
 
-// Replace CoinGecko fetching with Nomics
-const getTokenPrice = async (tokenSymbol: string) => {
-  return getTokenPriceWithNomics(tokenSymbol);
+// Token ID to address mapping
+const TOKEN_ID_TO_ADDRESS = {
+  1: CONTRACT_ADDRESSES.ETH,
+  2: CONTRACT_ADDRESSES.BTC,
+  3: CONTRACT_ADDRESSES.USDT,
+  4: CONTRACT_ADDRESSES.LINK,
 };
 
-// API rate limiting management
-const API_RATE_LIMIT = {
-  isRateLimited: false,
-  resetTime: 0,
-  queue: [] as (() => void)[],
-  batchSize: 5, // Increase the number of requests to process at once
-  processingQueue: false,
-  limit: 30, // CoinGecko's rate limit is 30 requests per minute for free tier
-};
+// Mock token data that matches our contract deployment
+const mockTokensList = [
+  {
+    id: 1,
+    symbol: "ETH",
+    name: "Wrapped Ether",
+    logoUrl: "https://cryptologos.cc/logos/ethereum-eth-logo.png",
+    decimals: 18,
+    contractAddress: CONTRACT_ADDRESSES.ETH,
+    network: "Ethereum",
+  },
+  {
+    id: 2,
+    symbol: "BTC",
+    name: "Wrapped Bitcoin",
+    logoUrl: "https://cryptologos.cc/logos/bitcoin-btc-logo.png",
+    decimals: 8,
+    contractAddress: CONTRACT_ADDRESSES.BTC,
+    network: "Ethereum",
+  },
+  {
+    id: 3,
+    symbol: "USDT",
+    name: "Tether USD",
+    logoUrl: "https://cryptologos.cc/logos/tether-usdt-logo.png",
+    decimals: 6,
+    contractAddress: CONTRACT_ADDRESSES.USDT,
+    network: "Ethereum",
+  },
+  {
+    id: 4,
+    symbol: "LINK",
+    name: "Chainlink Token",
+    logoUrl: "https://cryptologos.cc/logos/chainlink-link-logo.png",
+    decimals: 18,
+    contractAddress: CONTRACT_ADDRESSES.LINK,
+    network: "Ethereum",
+  },
+];
 
-// Process the API request queue when rate limit resets
-const processQueue = async () => {
-  if (API_RATE_LIMIT.processingQueue || API_RATE_LIMIT.queue.length === 0)
-    return;
-
-  API_RATE_LIMIT.processingQueue = true;
-
-  // Process batch of requests
-  const batch = API_RATE_LIMIT.queue.splice(0, API_RATE_LIMIT.batchSize);
-  for (const request of batch) {
-    request();
-    // Add a small delay between requests
-    await new Promise((resolve) => setTimeout(resolve, 300));
-  }
-
-  API_RATE_LIMIT.processingQueue = false;
-
-  // If there are more requests, schedule next batch
-  if (API_RATE_LIMIT.queue.length > 0) {
-    setTimeout(processQueue, 1000);
-  }
-};
-
-// Handle rate limit reset
-const handleRateLimitReset = () => {
-  const now = Date.now();
-  if (now >= API_RATE_LIMIT.resetTime) {
-    API_RATE_LIMIT.isRateLimited = false;
-    API_RATE_LIMIT.resetTime = 0;
-    processQueue();
-  } else {
-    // Check again when reset time is reached
-    const timeToReset = API_RATE_LIMIT.resetTime - now;
-    setTimeout(handleRateLimitReset, timeToReset);
-  }
-};
-
-// Mapping for token symbols to CoinGecko IDs
-const COINGECKO_ID_MAP: Record<string, string> = {
-  BTC: "bitcoin",
-  ETH: "ethereum",
-  SOL: "solana",
-  ADA: "cardano",
-  BNB: "binancecoin",
-  XRP: "ripple",
-  DOT: "polkadot",
-  DOGE: "dogecoin",
-  AVAX: "avalanche-2",
-  LINK: "chainlink",
-  USDT: "tether",
-  USDC: "usd-coin",
-  MATIC: "matic-network",
-  UNI: "uniswap",
-  SHIB: "shiba-inu",
-  LTC: "litecoin",
-  ATOM: "cosmos",
-  XLM: "stellar",
-  NEAR: "near",
-  ALGO: "algorand",
-  FIL: "filecoin",
-  AAVE: "aave",
-  CAKE: "pancakeswap-token",
-  SAND: "the-sandbox",
-  MANA: "decentraland",
-  ENJ: "enjincoin",
-  CRO: "crypto-com-chain",
-  GRT: "the-graph",
-  SUSHI: "sushi",
-  COMP: "compound-governance-token",
-  MKR: "maker",
-  YFI: "yearn-finance",
-  SNX: "synthetix-network-token",
-  BAT: "basic-attention-token",
-  CHZ: "chiliz",
-  "1INCH": "1inch",
-};
-
-// Utility to handle API errors
+// Error handler helper
 const handleApiError = (res: Response, error: unknown) => {
-  console.error("API Error:", error);
-
-  if (error instanceof ZodError) {
-    return res.status(400).json({
-      message: fromZodError(error).message,
+  console.error('API Error:', error);
+  
+  if (error instanceof Error) {
+    return res.status(500).json({
+      error: 'Server error',
+      message: error.message
     });
   }
-
+  
   return res.status(500).json({
-    message:
-      error instanceof Error ? error.message : "An unknown error occurred",
-  });
-};
-
-// Simulate network fee for blockchain transactions
-const simulateNetworkFee = () => {
-  // Returns a fee between 0.001 and 0.01 ETH (in string format)
-  const fee = (Math.random() * 0.009 + 0.001).toFixed(6);
-  return fee;
-};
-
-// Simulate transaction hash for blockchain transactions
-const simulateTxHash = () => {
-  return (
-    "0x" +
-    Array(64)
-      .fill(0)
-      .map(() => Math.floor(Math.random() * 16).toString(16))
-      .join("")
-  );
-};
-
-// Cache for storing token prices to reduce API calls
-const tokenPriceCache = new Map<
-  string,
-  {
-    data: {
-      price: string;
-      priceChange24h: string;
-      volume24h: string | null;
-      marketCap: string | null;
-    };
-    timestamp: number;
-  }
->();
-
-// Get token price from CoinGecko using their API with rate limiting and caching
-const getTokenPriceFromCoinGecko = async (
-  tokenSymbol: string,
-): Promise<{
-  price: string;
-  priceChange24h: string;
-  volume24h: string | null;
-  marketCap: string | null;
-}> => {
-  // Check cache first (valid for 30 minutes - increased to reduce API calls)
-  const cachedData = tokenPriceCache.get(tokenSymbol);
-  if (cachedData && Date.now() - cachedData.timestamp < 1800000) {
-    // 30 minutes
-    return cachedData.data;
-  }
-
-  // Create mock data for development when rate limited
-  const generateMockPriceData = (symbol: string) => {
-    // Use deterministic pricing based on symbol to make it realistic
-    const symbolHash = symbol
-      .split("")
-      .reduce((acc, char) => acc + char.charCodeAt(0), 0);
-
-    // Base price determined by symbol hash
-    const basePrice = (symbolHash % 1000) + (symbolHash % 100) / 100;
-
-    // Price change based on last digit of hash
-    const changeDir = symbolHash % 2 === 0 ? 1 : -1;
-    const priceChange = changeDir * ((symbolHash % 10) / 10);
-
-    // Volume and market cap based on price and hash
-    const volume = basePrice * 1000000 * (1 + (symbolHash % 10) / 10);
-    const marketCap = basePrice * 10000000 * (1 + (symbolHash % 5) / 10);
-
-    return {
-      price: basePrice.toString(),
-      priceChange24h: priceChange.toFixed(2),
-      volume24h: volume.toString(),
-      marketCap: marketCap.toString(),
-    };
-  };
-
-  // Returns a promise that resolves with token price data
-  return new Promise((resolve, reject) => {
-    const fetchPrice = async () => {
-      try {
-        // Convert token symbol to CoinGecko ID
-        const coinId =
-          COINGECKO_ID_MAP[tokenSymbol] || tokenSymbol.toLowerCase();
-
-        // Use the Demo API format
-        const apiUrl = "https://api.coingecko.com/api/v3";
-
-        // Build the request URL with demo API key format
-        let url = `${apiUrl}/simple/price?ids=${coinId}&vs_currencies=usd&include_24h_vol=true&include_24h_change=true&include_market_cap=true&x_cg_demo_api_key=${COINGECKO_API_KEY}`;
-
-        // Set headers with API key for additional authentication method
-        const headers = {
-          "x-cg-demo-api-key": COINGECKO_API_KEY,
-        };
-
-        try {
-          // Try to get data from API with both query param and header authentication
-          const response = await axios.get(url, { headers });
-
-          if (!response.data || !response.data[coinId]) {
-            throw new Error(`Price data not found for ${tokenSymbol}`);
-          }
-
-          const data = response.data[coinId];
-          const result = {
-            price: data.usd.toString(),
-            priceChange24h: data.usd_24h_change
-              ? data.usd_24h_change.toFixed(2)
-              : "0.00",
-            volume24h: data.usd_24h_vol ? data.usd_24h_vol.toString() : null,
-            marketCap: data.usd_market_cap
-              ? data.usd_market_cap.toString()
-              : null,
-          };
-
-          // Update cache
-          tokenPriceCache.set(tokenSymbol, {
-            data: result,
-            timestamp: Date.now(),
-          });
-
-          resolve(result);
-        } catch (apiError: any) {
-          // If we're rate limited, generate mock data based on the token symbol
-          if (apiError.response && apiError.response.status === 429) {
-            console.log(`Rate limited for ${tokenSymbol}. Using backup data.`);
-
-            // Generate mock data
-            const mockData = generateMockPriceData(tokenSymbol);
-
-            // Cache the mock data
-            tokenPriceCache.set(tokenSymbol, {
-              data: mockData,
-              timestamp: Date.now(),
-            });
-
-            resolve(mockData);
-          } else {
-            throw apiError;
-          }
-        }
-      } catch (error: any) {
-        console.error(`Error fetching price for ${tokenSymbol}:`, error);
-
-        // If we have cached data, use that instead of rejecting on error
-        if (cachedData) {
-          console.log(`Using cached data for ${tokenSymbol} due to error`);
-          resolve(cachedData.data);
-        } else {
-          // Generate mock data as a last resort
-          const mockData = generateMockPriceData(tokenSymbol);
-
-          // Cache the mock data
-          tokenPriceCache.set(tokenSymbol, {
-            data: mockData,
-            timestamp: Date.now(),
-          });
-
-          resolve(mockData);
-        }
-      }
-    };
-
-    // Execute request immediately or use cached data
-    if (API_RATE_LIMIT.isRateLimited) {
-      if (cachedData) {
-        // Use cached data
-        console.log(
-          `Using cached data for ${tokenSymbol} due to active rate limiting`,
-        );
-        resolve(cachedData.data);
-      } else {
-        // Generate mock data as we're rate limited and have no cache
-        const mockData = generateMockPriceData(tokenSymbol);
-        tokenPriceCache.set(tokenSymbol, {
-          data: mockData,
-          timestamp: Date.now(),
-        });
-        resolve(mockData);
-      }
-    } else {
-      // Execute request immediately
-      fetchPrice();
-    }
-  });
-};
-
-// Get trending cryptocurrencies from CoinGecko with rate limiting
-const getTrendingCoins = async () => {
-  return new Promise((resolve, reject) => {
-    const fetchTrending = async () => {
-      try {
-        // Use the public CoinGecko API with demo key
-        const apiUrl = "https://api.coingecko.com/api/v3";
-
-        // Build the request URL with Demo API key format
-        let url = `${apiUrl}/search/trending?x_cg_demo_api_key=${COINGECKO_API_KEY}`;
-
-        // Set headers with API key for additional authentication method
-        const headers = {
-          "x-cg-demo-api-key": COINGECKO_API_KEY,
-        };
-
-        const response = await axios.get(url, { headers });
-        const trendingCoins = response.data.coins.map((coin: any) => ({
-          id: coin.item.id,
-          name: coin.item.name,
-          symbol: coin.item.symbol,
-          logoUrl: coin.item.large,
-          marketCapRank: coin.item.market_cap_rank,
-        }));
-        resolve(trendingCoins);
-      } catch (error: any) {
-        // Handle rate limiting
-        if (error.response && error.response.status === 429) {
-          console.log(
-            "Rate limited when fetching trending coins. Adding to queue.",
-          );
-
-          // Get retry time from headers if available
-          const retryAfter = error.response.headers["retry-after"];
-          const resetTime = retryAfter
-            ? Date.now() + parseInt(retryAfter) * 1000
-            : Date.now() + 60000; // Default to 60 seconds
-
-          // Update rate limit status
-          API_RATE_LIMIT.isRateLimited = true;
-          API_RATE_LIMIT.resetTime = Math.max(
-            API_RATE_LIMIT.resetTime,
-            resetTime,
-          );
-
-          // Add request to queue
-          API_RATE_LIMIT.queue.push(() => {
-            getTrendingCoins().then(resolve).catch(reject);
-          });
-
-          // Start rate limit reset handler if not already started
-          if (API_RATE_LIMIT.resetTime > 0 && !API_RATE_LIMIT.processingQueue) {
-            setTimeout(
-              handleRateLimitReset,
-              Math.max(1000, API_RATE_LIMIT.resetTime - Date.now()),
-            );
-          }
-
-          // Return empty trending list for now
-          resolve([]);
-        } else {
-          console.error("Error fetching trending coins:", error);
-          reject(error);
-        }
-      }
-    };
-
-    // If currently rate limited, add to queue
-    if (API_RATE_LIMIT.isRateLimited) {
-      API_RATE_LIMIT.queue.push(() => {
-        getTrendingCoins().then(resolve).catch(reject);
-      });
-
-      // Return empty trending list for now
-      resolve([]);
-    } else {
-      // Execute request immediately
-      fetchTrending();
-    }
-  });
-};
-
-// Get global crypto market data with rate limiting
-const getGlobalMarketData = async () => {
-  return new Promise((resolve, reject) => {
-    const fetchGlobalData = async () => {
-      try {
-        // Use the public CoinGecko API with demo key
-        const apiUrl = "https://api.coingecko.com/api/v3";
-
-        // Build the request URL with Demo API key format
-        let url = `${apiUrl}/global?x_cg_demo_api_key=${COINGECKO_API_KEY}`;
-
-        // Set headers with API key for additional authentication method
-        const headers = {
-          "x-cg-demo-api-key": COINGECKO_API_KEY,
-        };
-
-        const response = await axios.get(url, { headers });
-        const data = response.data.data;
-
-        resolve({
-          totalMarketCap: data.total_market_cap.usd,
-          totalVolume24h: data.total_volume.usd,
-          marketCapPercentage: data.market_cap_percentage,
-          marketCapChangePercentage24hUsd:
-            data.market_cap_change_percentage_24h_usd,
-        });
-      } catch (error: any) {
-        // Handle rate limiting
-        if (error.response && error.response.status === 429) {
-          console.log(
-            "Rate limited when fetching global market data. Adding to queue.",
-          );
-
-          // Get retry time from headers if available
-          const retryAfter = error.response.headers["retry-after"];
-          const resetTime = retryAfter
-            ? Date.now() + parseInt(retryAfter) * 1000
-            : Date.now() + 60000; // Default to 60 seconds
-
-          // Update rate limit status
-          API_RATE_LIMIT.isRateLimited = true;
-          API_RATE_LIMIT.resetTime = Math.max(
-            API_RATE_LIMIT.resetTime,
-            resetTime,
-          );
-
-          // Add request to queue
-          API_RATE_LIMIT.queue.push(() => {
-            getGlobalMarketData().then(resolve).catch(reject);
-          });
-
-          // Start rate limit reset handler if not already started
-          if (API_RATE_LIMIT.resetTime > 0 && !API_RATE_LIMIT.processingQueue) {
-            setTimeout(
-              handleRateLimitReset,
-              Math.max(1000, API_RATE_LIMIT.resetTime - Date.now()),
-            );
-          }
-
-          // Return default market data for now
-          resolve({
-            totalMarketCap: 0,
-            totalVolume24h: 0,
-            marketCapPercentage: {},
-            marketCapChangePercentage24hUsd: 0,
-          });
-        } else {
-          console.error("Error fetching global market data:", error);
-          reject(error);
-        }
-      }
-    };
-
-    // If currently rate limited, add to queue
-    if (API_RATE_LIMIT.isRateLimited) {
-      API_RATE_LIMIT.queue.push(() => {
-        getGlobalMarketData().then(resolve).catch(reject);
-      });
-
-      // Return default market data for now
-      resolve({
-        totalMarketCap: 0,
-        totalVolume24h: 0,
-        marketCapPercentage: {},
-        marketCapChangePercentage24hUsd: 0,
-      });
-    } else {
-      // Execute request immediately
-      fetchGlobalData();
-    }
+    error: 'Unknown error',
+    message: 'An unknown error occurred'
   });
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // API routes - prefix with /api
-
   // Get all tokens
-  app.get("/api/tokens", async (req, res) => {
-    try {
-      const tokens = await storage.getAllTokens();
-      return res.json(tokens);
-    } catch (error) {
-      return handleApiError(res, error);
-    }
+  app.get('/api/tokens', (req, res) => {
+    res.json(mockTokensList);
   });
 
   // Get token prices
-  app.get("/api/prices", async (req, res) => {
+  app.get('/api/prices', async (req, res) => {
     try {
-      const tokenPrices = await storage.getAllTokenPrices();
-      const tokens = await storage.getAllTokens();
-
-      const result = await Promise.all(
-        tokens.map(async (token) => {
-          const tokenPrice = tokenPrices.find((tp) => tp.tokenId === token.id);
-
-          // Try to get real-time price from CoinGecko
-          try {
-            const livePrice = await getTokenPriceFromCoinGecko(token.symbol);
-
-            // Update price in storage
-            if (livePrice) {
-              await storage.createOrUpdateTokenPrice({
-                tokenId: token.id,
-                price: livePrice.price,
-                priceChange24h: livePrice.priceChange24h,
-                volume24h: livePrice.volume24h || null,
-                marketCap: livePrice.marketCap || null,
-                rank: null,
-                supply: null,
-                ath: null,
-                athChangePercentage: null,
-              });
-            }
-
-            return {
-              id: token.id,
-              symbol: token.symbol,
-              name: token.name,
-              logoUrl: token.logoUrl,
-              price: livePrice.price,
-              priceChange24h: livePrice.priceChange24h,
-              volume24h: livePrice.volume24h || "0",
-              marketCap: livePrice.marketCap || "0",
-            };
-          } catch (error) {
-            console.error(
-              `Failed to fetch live price for ${token.symbol}:`,
-              error,
-            );
-            // Use stored price data as fallback
-            return {
-              id: token.id,
-              symbol: token.symbol,
-              name: token.name,
-              logoUrl: token.logoUrl,
-              price: tokenPrice?.price || "0",
-              priceChange24h: tokenPrice?.priceChange24h || "0",
-              volume24h: tokenPrice?.volume24h || "0",
-              marketCap: "0",
-            };
-          }
-        }),
-      );
-
-      return res.json(result);
-    } catch (error) {
-      return handleApiError(res, error);
-    }
-  });
-
-  // Get trending cryptocurrencies
-  app.get("/api/trending", async (req, res) => {
-    try {
-      const trendingCoins = await getTrendingCoins();
-      return res.json(trendingCoins);
-    } catch (error) {
-      return handleApiError(res, error);
-    }
-  });
-
-  // Get global market data
-  app.get("/api/market/global", async (req, res) => {
-    try {
-      const globalData = await getGlobalMarketData();
-      return res.json(globalData);
-    } catch (error) {
-      return handleApiError(res, error);
-    }
-  });
-
-  // Get detailed information for a specific coin
-  app.get("/api/coins/:id", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const coinId = COINGECKO_ID_MAP[id.toUpperCase()] || id.toLowerCase();
-
-      // Use the public CoinGecko API with demo key
-      const apiUrl = "https://api.coingecko.com/api/v3";
-
-      // Build the request URL with Demo API key format
-      let url = `${apiUrl}/coins/${coinId}?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=false&x_cg_demo_api_key=${COINGECKO_API_KEY}`;
-
-      // Set headers with API key for additional authentication method
-      const headers = {
-        "x-cg-demo-api-key": COINGECKO_API_KEY,
-      };
-
-      const response = await axios.get(url, { headers });
-
-      const data = response.data;
-
-      return res.json({
-        id: data.id,
-        symbol: data.symbol,
-        name: data.name,
-        logoUrl: data.image.large,
-        description: data.description.en,
-        marketCap: data.market_data.market_cap.usd,
-        marketCapRank: data.market_cap_rank,
-        fullyDilutedValuation:
-          data.market_data.fully_diluted_valuation?.usd || null,
-        totalVolume: data.market_data.total_volume.usd,
-        high24h: data.market_data.high_24h.usd,
-        low24h: data.market_data.low_24h.usd,
-        priceChange24h: data.market_data.price_change_24h,
-        priceChangePercentage24h: data.market_data.price_change_percentage_24h,
-        priceChangePercentage7d: data.market_data.price_change_percentage_7d,
-        priceChangePercentage30d: data.market_data.price_change_percentage_30d,
-        marketCapChange24h: data.market_data.market_cap_change_24h,
-        marketCapChangePercentage24h:
-          data.market_data.market_cap_change_percentage_24h,
-        circulatingSupply: data.market_data.circulating_supply,
-        totalSupply: data.market_data.total_supply,
-        maxSupply: data.market_data.max_supply,
-        ath: data.market_data.ath.usd,
-        athChangePercentage: data.market_data.ath_change_percentage.usd,
-        athDate: data.market_data.ath_date.usd,
-        atl: data.market_data.atl.usd,
-        atlChangePercentage: data.market_data.atl_change_percentage.usd,
-        atlDate: data.market_data.atl_date.usd,
-        lastUpdated: data.last_updated,
-      });
-    } catch (error) {
-      return handleApiError(res, error);
-    }
-  });
-
-  // Get market chart data for a specific coin
-  app.get("/api/coins/:id/chart", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { days = 7 } = req.query;
-      const coinId = COINGECKO_ID_MAP[id.toUpperCase()] || id.toLowerCase();
-
-      // Use the public CoinGecko API with demo key
-      const apiUrl = "https://api.coingecko.com/api/v3";
-
-      // Build the request URL with Demo API key format
-      let url = `${apiUrl}/coins/${coinId}/market_chart?vs_currency=usd&days=${days}&x_cg_demo_api_key=${COINGECKO_API_KEY}`;
-
-      // Set headers with API key for additional authentication method
-      const headers = {
-        "x-cg-demo-api-key": COINGECKO_API_KEY,
-      };
-
-      const response = await axios.get(url, { headers });
-
-      const { prices, market_caps, total_volumes } = response.data;
-
-      return res.json({
-        prices,
-        marketCaps: market_caps,
-        totalVolumes: total_volumes,
-      });
-    } catch (error) {
-      return handleApiError(res, error);
-    }
-  });
-
-  // Get user portfolio (balances with token info)
-  app.get("/api/portfolio/:walletAddress", async (req, res) => {
-    try {
-      const { walletAddress } = req.params;
-
-      let user = await storage.getUserByWalletAddress(walletAddress);
-
-      // If user doesn't exist, create a new one but don't add fake balances
-      if (!user) {
-        user = await storage.createUser({
-          username: `user_${Math.floor(Math.random() * 10000)}`,
-          password: "password", // This is a demo app
-          walletAddress,
-        });
-
-        // Create empty balances
-        const tokens = await storage.getAllTokens();
-        for (const token of tokens) {
-          await storage.createOrUpdateUserBalance({
-            userId: user.id,
-            tokenId: token.id,
-            balance: "0",
-          });
-        }
-      }
-
-      const balances = await storage.getUserBalances(user.id);
-      const tokens = await storage.getAllTokens();
-      const tokenPrices = await storage.getAllTokenPrices();
-
-      const portfolio = await Promise.all(
-        balances.map(async (balance) => {
-          const token = tokens.find((t) => t.id === balance.tokenId);
-          const tokenPrice = tokenPrices.find(
-            (tp) => tp.tokenId === balance.tokenId,
-          );
-
-          if (!token || !tokenPrice) return null;
-
-          // Try to get real-time price from CoinGecko
-          try {
-            const livePrice = await getTokenPriceFromCoinGecko(token.symbol);
-            const price = livePrice?.price || tokenPrice.price;
-
-            return {
-              id: balance.id,
-              token: {
-                id: token.id,
-                symbol: token.symbol,
-                name: token.name,
-                logoUrl: token.logoUrl,
-              },
-              balance: balance.balance,
-              value: (parseFloat(balance.balance) * parseFloat(price)).toFixed(
-                2,
-              ),
-              price: price,
-              priceChange24h:
-                livePrice?.priceChange24h || tokenPrice.priceChange24h || "0",
-            };
-          } catch (error) {
-            // Use stored price data as fallback
-            return {
-              id: balance.id,
-              token: {
-                id: token.id,
-                symbol: token.symbol,
-                name: token.name,
-                logoUrl: token.logoUrl,
-              },
-              balance: balance.balance,
-              value: (
-                parseFloat(balance.balance) * parseFloat(tokenPrice.price)
-              ).toFixed(2),
-              price: tokenPrice.price,
-              priceChange24h: tokenPrice.priceChange24h || "0",
-            };
-          }
-        }),
-      );
-
-      // Filter out null values
-      const filteredPortfolio = portfolio.filter((item) => item !== null);
-
-      // Calculate total value
-      const totalValue = filteredPortfolio
-        .reduce((sum, item) => sum + parseFloat(item!.value), 0)
-        .toFixed(2);
-
-      return res.json({
-        walletAddress,
-        totalValue,
-        assets: filteredPortfolio,
-      });
-    } catch (error) {
-      return handleApiError(res, error);
-    }
-  });
-
-  // Get recent transactions
-  app.get("/api/transactions/:walletAddress", async (req, res) => {
-    try {
-      const { walletAddress } = req.params;
-
-      const user = await storage.getUserByWalletAddress(walletAddress);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      const transactions = await storage.getUserTransactions(user.id, 10);
-      const tokens = await storage.getAllTokens();
-
-      const txWithDetails = transactions.map((tx) => {
-        const fromToken = tokens.find((t) => t.id === tx.fromTokenId);
-        const toToken = tokens.find((t) => t.id === tx.toTokenId);
-
+      // Simulate token prices from the blockchain
+      const prices = mockTokensList.map(token => {
+        let price = "0";
+        let priceChange24h = (Math.random() * 10 - 5).toFixed(2);
+        
+        // Set baseline prices
+        if (token.symbol === "ETH") price = "3000";
+        else if (token.symbol === "BTC") price = "60000";
+        else if (token.symbol === "USDT") price = "1";
+        else if (token.symbol === "LINK") price = "15";
+        
         return {
-          id: tx.id,
-          type: tx.type,
-          status: tx.status,
-          fromToken: fromToken
-            ? {
-                id: fromToken.id,
-                symbol: fromToken.symbol,
-                name: fromToken.name,
-                logoUrl: fromToken.logoUrl,
-              }
-            : null,
-          toToken: toToken
-            ? {
-                id: toToken.id,
-                symbol: toToken.symbol,
-                name: toToken.name,
-                logoUrl: toToken.logoUrl,
-              }
-            : null,
-          fromAmount: tx.fromAmount,
-          toAmount: tx.toAmount,
-          price: tx.price,
-          txHash: tx.txHash,
-          networkFee: tx.networkFee,
-          createdAt: tx.createdAt,
-          timestamp: tx.createdAt ? tx.createdAt.getTime() : Date.now(),
+          id: token.id,
+          symbol: token.symbol,
+          name: token.name,
+          logoUrl: token.logoUrl,
+          price,
+          priceChange24h,
+          volume24h: (parseFloat(price) * 1000000).toString(),
+          marketCap: (parseFloat(price) * 10000000).toString(),
         };
       });
-
-      return res.json(txWithDetails);
+      
+      res.json(prices);
     } catch (error) {
-      return handleApiError(res, error);
+      handleApiError(res, error);
+    }
+  });
+
+  // Get chart data
+  app.get('/api/chart/:symbol/:days', (req, res) => {
+    try {
+      const { symbol, days } = req.params;
+      
+      // Generate data points for the chart
+      const numDataPoints = parseInt(days) * 24; // hourly data
+      const chartData = {
+        prices: [],
+        marketCaps: [],
+        totalVolumes: [],
+      };
+      
+      // Find base price for the token
+      let basePrice = 100;
+      const token = mockTokensList.find(t => t.symbol.toUpperCase() === symbol.toUpperCase());
+      
+      if (symbol.toUpperCase() === 'ETH') {
+        basePrice = 3000;
+      } else if (symbol.toUpperCase() === 'BTC') {
+        basePrice = 60000;
+      } else if (symbol.toUpperCase() === 'USDT') {
+        basePrice = 1;
+      } else if (symbol.toUpperCase() === 'LINK') {
+        basePrice = 15;
+      }
+      
+      const volatility = 0.05; // 5% volatility
+      let currentPrice = basePrice;
+      const now = Date.now();
+      const millisecondsPerDataPoint = (parseInt(days) * 24 * 60 * 60 * 1000) / numDataPoints;
+      
+      for (let i = 0; i < numDataPoints; i++) {
+        // Random price movement
+        const priceChange = currentPrice * (Math.random() * volatility * 2 - volatility);
+        currentPrice += priceChange;
+        currentPrice = Math.max(currentPrice, basePrice * 0.7); // Prevent price from going too low
+        
+        const timestamp = now - ((numDataPoints - i) * millisecondsPerDataPoint);
+        
+        // Add price data point
+        chartData.prices.push([timestamp, currentPrice]);
+        
+        // Add market cap
+        const marketCap = currentPrice * 1000000; // Assume 1M circulating supply
+        chartData.marketCaps.push([timestamp, marketCap]);
+        
+        // Add volume
+        const volume = Math.abs(priceChange) * currentPrice * 10000;
+        chartData.totalVolumes.push([timestamp, volume]);
+      }
+      
+      res.json(chartData);
+    } catch (error) {
+      handleApiError(res, error);
     }
   });
 
   // Swap tokens
-  app.post("/api/swap", async (req, res) => {
+  app.post('/api/swap', async (req, res) => {
     try {
-      const swapData = swapTokensSchema.parse(req.body);
-
-      const fromToken = await storage.getToken(swapData.fromTokenId);
-      const toToken = await storage.getToken(swapData.toTokenId);
-
-      if (!fromToken || !toToken) {
-        return res.status(404).json({ message: "Token not found" });
+      const { fromTokenId, toTokenId, fromAmount, walletAddress } = swapTokensSchema.parse(req.body);
+      
+      // Get token addresses
+      const fromTokenAddress = TOKEN_ID_TO_ADDRESS[fromTokenId];
+      const toTokenAddress = TOKEN_ID_TO_ADDRESS[toTokenId];
+      
+      if (!fromTokenAddress || !toTokenAddress) {
+        return res.status(400).json({ error: 'Invalid token IDs' });
       }
-
-      // Get user by wallet address or create if not exists
-      let user = await storage.getUserByWalletAddress(
-        swapData.walletAddress || "",
-      );
-
-      if (!user && swapData.walletAddress) {
-        user = await storage.createUser({
-          username: `user_${Math.floor(Math.random() * 10000)}`,
-          password: "password", // This is a demo app
-          walletAddress: swapData.walletAddress,
-        });
-      }
-
-      if (!user) {
-        return res.status(400).json({ message: "Wallet address is required" });
-      }
-
-      // Get token prices from API
-      let fromTokenPrice;
-      let toTokenPrice;
-
-      try {
-        // Try to get live prices
-        fromTokenPrice = await getTokenPriceFromCoinGecko(fromToken.symbol);
-        toTokenPrice = await getTokenPriceFromCoinGecko(toToken.symbol);
-      } catch (error) {
-        console.error("Error fetching live prices for swap:", error);
-        // Fallback to stored prices
-        const storedFromPrice = await storage.getTokenPrice(fromToken.id);
-        const storedToPrice = await storage.getTokenPrice(toToken.id);
-
-        if (!storedFromPrice || !storedToPrice) {
-          return res
-            .status(404)
-            .json({ message: "Token prices not available" });
-        }
-
-        fromTokenPrice = {
-          price: storedFromPrice.price,
-          priceChange24h: storedFromPrice.priceChange24h || "0",
-        };
-
-        toTokenPrice = {
-          price: storedToPrice.price,
-          priceChange24h: storedToPrice.priceChange24h || "0",
-        };
-      }
-
-      // Calculate exchange rate and amount to receive
-      const fromAmount = parseFloat(swapData.fromAmount);
-      const rate =
-        parseFloat(toTokenPrice.price) / parseFloat(fromTokenPrice.price);
-      const toAmount = (fromAmount * rate).toFixed(toToken.decimals || 6);
-
-      // Check if user has sufficient balance
-      const userFromBalance = await storage.getUserBalance(
-        user.id,
-        fromToken.id,
-      );
-
-      if (
-        !userFromBalance ||
-        parseFloat(userFromBalance.balance) < fromAmount
-      ) {
-        return res.status(400).json({ message: "Insufficient balance" });
-      }
-
-      // Create transaction
-      const networkFee = simulateNetworkFee();
-
-      const transaction = await storage.createTransaction({
-        userId: user.id,
-        type: "swap",
-        status: "pending",
-        fromTokenId: fromToken.id,
-        toTokenId: toToken.id,
-        fromAmount: fromAmount.toString(),
-        toAmount,
-        price: fromTokenPrice.price,
-        networkFee,
-        metadata: {
-          rate: rate.toString(),
-          priceImpact: "0.05",
-        },
-      });
-
-      // Simulate transaction confirmation (would be a blockchain call in production)
-      // setTimeout(async () => {
-      //   // Update transaction status
-      //   const txHash = simulateTxHash();
-      //   await storage.updateTransactionStatus(transaction.id, "completed", txHash);
-
-      //   // Update user balances
-      //   const updatedFromBalance = (parseFloat(userFromBalance.balance) - fromAmount).toString();
-      //   await storage.createOrUpdateUserBalance({
-      //     userId: user.id,
-      //     tokenId: fromToken.id,
-      //     balance: updatedFromBalance
-      //   });
-
-      //   // Update or create to balance
-      //   const userToBalance = await storage.getUserBalance(user.id, toToken.id);
-      //   const updatedToBalance = userToBalance
-      //     ? (parseFloat(userToBalance.balance) + parseFloat(toAmount)).toString()
-      //     : toAmount;
-
-      //   await storage.createOrUpdateUserBalance({
-      //     userId: user.id,
-      //     tokenId: toToken.id,
-      //     balance: updatedToBalance
-      //   });
-      // }, 2000);
-
-      return res.json({
-        transactionId: transaction.id,
-        status: transaction.status,
+      
+      // Get token objects
+      const fromToken = mockTokensList.find(t => t.id === fromTokenId);
+      const toToken = mockTokensList.find(t => t.id === toTokenId);
+      
+      // Simulate blockchain interaction for swap
+      // In production, this would interact with the actual contracts
+      
+      // Simulate exchange rates
+      const exchangeRates = {
+        "ETH_USDT": "3000",
+        "USDT_ETH": "0.000333",
+        "BTC_USDT": "60000",
+        "USDT_BTC": "0.0000166",
+        "LINK_USDT": "15",
+        "USDT_LINK": "0.0666",
+        "ETH_BTC": "0.05",  // 1 ETH = 0.05 BTC
+        "BTC_ETH": "20",    // 1 BTC = 20 ETH
+        "ETH_LINK": "200",  // 1 ETH = 200 LINK
+        "LINK_ETH": "0.005", // 1 LINK = 0.005 ETH
+        "BTC_LINK": "4000", // 1 BTC = 4000 LINK
+        "LINK_BTC": "0.00025" // 1 LINK = 0.00025 BTC
+      };
+      
+      // Get exchange rate key
+      const rateKey = `${fromToken.symbol}_${toToken.symbol}`;
+      let rate = exchangeRates[rateKey] || "1";
+      
+      // Calculate output amount
+      const outputAmount = (parseFloat(fromAmount) * parseFloat(rate)).toString();
+      
+      // Create response object
+      const response = {
+        transactionId: Date.now(), // Unique ID for the transaction
+        status: "completed",
         fromToken: {
           id: fromToken.id,
           symbol: fromToken.symbol,
@@ -979,136 +279,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
           symbol: toToken.symbol,
           name: toToken.name,
         },
-        fromAmount: swapData.fromAmount,
-        toAmount,
-        rate: rate.toString(),
-        networkFee,
-      });
+        fromAmount,
+        toAmount: outputAmount,
+        rate,
+        networkFee: "0.001", // Mock network fee
+      };
+      
+      res.json(response);
     } catch (error) {
-      return handleApiError(res, error);
+      handleApiError(res, error);
     }
   });
 
-  // Spot trade (buy/sell)
-  app.post("/api/trade", async (req, res) => {
+  // Execute trade (spot trading)
+  app.post('/api/trade', async (req, res) => {
     try {
-      const tradeData = spotTradeSchema.parse(req.body);
-
-      const token = await storage.getToken(tradeData.tokenId);
-      const baseToken = await storage.getToken(tradeData.baseTokenId);
-
+      const { tokenId, baseTokenId, amount, price, type, walletAddress } = spotTradeSchema.parse(req.body);
+      
+      // Get token objects
+      const token = mockTokensList.find(t => t.id === tokenId);
+      const baseToken = mockTokensList.find(t => t.id === baseTokenId);
+      
       if (!token || !baseToken) {
-        return res.status(404).json({ message: "Token not found" });
+        return res.status(400).json({ error: 'Invalid token IDs' });
       }
-
-      // Get user by wallet address or create if not exists
-      let user = await storage.getUserByWalletAddress(
-        tradeData.walletAddress || "",
-      );
-
-      if (!user && tradeData.walletAddress) {
-        user = await storage.createUser({
-          username: `user_${Math.floor(Math.random() * 10000)}`,
-          password: "password", // This is a demo app
-          walletAddress: tradeData.walletAddress,
-        });
-      }
-
-      if (!user) {
-        return res.status(400).json({ message: "Wallet address is required" });
-      }
-
-      const amount = parseFloat(tradeData.amount);
-      const price = parseFloat(tradeData.price);
-      const total = amount * price;
-
-      // For buy: check if user has enough baseToken (e.g., USDT)
-      // For sell: check if user has enough token (e.g., ETH)
-      const sourceTokenId = tradeData.type === "buy" ? baseToken.id : token.id;
-      const sourceAmount = tradeData.type === "buy" ? total : amount;
-
-      const userSourceBalance = await storage.getUserBalance(
-        user.id,
-        sourceTokenId,
-      );
-
-      if (
-        !userSourceBalance ||
-        parseFloat(userSourceBalance.balance) < sourceAmount
-      ) {
-        return res.status(400).json({ message: "Insufficient balance" });
-      }
-
-      // Create transaction
-      const networkFee = simulateNetworkFee();
-
-      const fromTokenId = tradeData.type === "buy" ? baseToken.id : token.id;
-      const toTokenId = tradeData.type === "buy" ? token.id : baseToken.id;
-      const fromAmount =
-        tradeData.type === "buy" ? total.toString() : amount.toString();
-      const toAmount =
-        tradeData.type === "buy" ? amount.toString() : total.toString();
-
-      const transaction = await storage.createTransaction({
-        userId: user.id,
-        type: tradeData.type,
-        status: "pending",
-        fromTokenId,
-        toTokenId,
-        fromAmount,
-        toAmount,
-        price: price.toString(),
-        networkFee,
-        metadata: {
-          pair: `${token.symbol}/${baseToken.symbol}`,
-        },
-      });
-
-      // Simulate transaction confirmation (would be a blockchain call in production)
-      setTimeout(async () => {
-        // Update transaction status
-        const txHash = simulateTxHash();
-        await storage.updateTransactionStatus(
-          transaction.id,
-          "completed",
-          txHash,
-        );
-
-        // Update user balances
-        // Decrease source balance
-        const updatedSourceBalance = (
-          parseFloat(userSourceBalance.balance) - sourceAmount
-        ).toString();
-        await storage.createOrUpdateUserBalance({
-          userId: user.id,
-          tokenId: sourceTokenId,
-          balance: updatedSourceBalance,
-        });
-
-        // Increase target balance
-        const targetTokenId =
-          tradeData.type === "buy" ? token.id : baseToken.id;
-        const targetAmount = tradeData.type === "buy" ? amount : total;
-
-        const userTargetBalance = await storage.getUserBalance(
-          user.id,
-          targetTokenId,
-        );
-        const updatedTargetBalance = userTargetBalance
-          ? (parseFloat(userTargetBalance.balance) + targetAmount).toString()
-          : targetAmount.toString();
-
-        await storage.createOrUpdateUserBalance({
-          userId: user.id,
-          tokenId: targetTokenId,
-          balance: updatedTargetBalance,
-        });
-      }, 2000);
-
-      return res.json({
-        transactionId: transaction.id,
-        status: transaction.status,
-        type: tradeData.type,
+      
+      // Calculate total cost in base token
+      const totalCost = (parseFloat(amount) * parseFloat(price)).toString();
+      
+      // Create response object
+      const response = {
+        transactionId: Date.now(), // Unique ID for the transaction
+        status: "completed",
+        type,
         token: {
           id: token.id,
           symbol: token.symbol,
@@ -1119,31 +322,179 @@ export async function registerRoutes(app: Express): Promise<Server> {
           symbol: baseToken.symbol,
           name: baseToken.name,
         },
-        amount: tradeData.amount,
-        price: tradeData.price,
-        total: total.toString(),
-        networkFee,
-      });
+        amount,
+        price,
+        total: totalCost,
+        networkFee: "0.001", // Mock network fee
+      };
+      
+      res.json(response);
     } catch (error) {
-      return handleApiError(res, error);
+      handleApiError(res, error);
     }
   });
 
-  // Get gas price (simulated)
-  app.get("/api/gas-price", async (req, res) => {
+  // Get portfolio
+  app.get('/api/portfolio/:walletAddress', async (req, res) => {
     try {
-      // In a real app, this would call an actual gas price API
-      const gasPrice = Math.floor(Math.random() * 70) + 20; // 20-90 Gwei
-
-      return res.json({
-        gasPrice: `${gasPrice}`,
-        unit: "Gwei",
-        timestamp: new Date().toISOString(),
+      const { walletAddress } = req.params;
+      
+      // Simulate portfolio data
+      // In production, this would get real balances from the blockchain
+      const assets = mockTokensList.map(token => {
+        const balance = (Math.random() * 10).toFixed(4);
+        let price = "0";
+        
+        if (token.symbol === "ETH") price = "3000";
+        else if (token.symbol === "BTC") price = "60000";
+        else if (token.symbol === "USDT") price = "1";
+        else if (token.symbol === "LINK") price = "15";
+        
+        const value = (parseFloat(balance) * parseFloat(price)).toString();
+        
+        return {
+          id: token.id,
+          token: {
+            id: token.id,
+            symbol: token.symbol,
+            name: token.name,
+            logoUrl: token.logoUrl,
+          },
+          balance,
+          value,
+          price,
+        };
       });
+      
+      // Calculate total value
+      const totalValue = assets.reduce((sum, asset) => sum + parseFloat(asset.value), 0).toString();
+      
+      // Create portfolio object
+      const portfolio = {
+        walletAddress: walletAddress || adminWallet.address,
+        totalValue,
+        todayChange: (Math.random() * 10 - 5).toFixed(2), // Random change
+        assets,
+      };
+      
+      res.json(portfolio);
     } catch (error) {
-      return handleApiError(res, error);
+      handleApiError(res, error);
     }
   });
 
-  return createServer(app);
+  // Get transaction history
+  app.get('/api/transactions/:walletAddress', (req, res) => {
+    try {
+      const { walletAddress } = req.params;
+      
+      // Simulate transaction history
+      // In production, this would get real transaction data from the blockchain
+      const transactions = [];
+      
+      // Add swap transactions
+      for (let i = 0; i < 5; i++) {
+        const fromToken = mockTokensList[Math.floor(Math.random() * mockTokensList.length)];
+        let toToken;
+        do {
+          toToken = mockTokensList[Math.floor(Math.random() * mockTokensList.length)];
+        } while (toToken.id === fromToken.id);
+        
+        const fromAmount = (Math.random() * 10).toFixed(4);
+        let price = "1";
+        if (fromToken.symbol === "ETH" && toToken.symbol === "USDT") price = "3000";
+        else if (fromToken.symbol === "BTC" && toToken.symbol === "USDT") price = "60000";
+        else if (fromToken.symbol === "LINK" && toToken.symbol === "USDT") price = "15";
+        
+        const toAmount = (parseFloat(fromAmount) * parseFloat(price)).toFixed(4);
+        
+        transactions.push({
+          id: i + 1,
+          type: "swap",
+          status: "completed",
+          fromToken: {
+            id: fromToken.id,
+            symbol: fromToken.symbol,
+            name: fromToken.name,
+            logoUrl: fromToken.logoUrl,
+          },
+          toToken: {
+            id: toToken.id,
+            symbol: toToken.symbol,
+            name: toToken.name,
+            logoUrl: toToken.logoUrl,
+          },
+          fromAmount,
+          toAmount,
+          price,
+          txHash: `0x${Math.random().toString(16).slice(2, 66)}`,
+          networkFee: "0.001",
+          createdAt: new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString(),
+          timestamp: Math.floor(Date.now() / 1000) - i * 24 * 60 * 60,
+        });
+      }
+      
+      // Add spot trading transactions
+      for (let i = 0; i < 5; i++) {
+        const token = mockTokensList[Math.floor(Math.random() * mockTokensList.length)];
+        const baseToken = mockTokensList.find(t => t.symbol === "USDT");
+        
+        const amount = (Math.random() * 10).toFixed(4);
+        let price = "1";
+        if (token.symbol === "ETH") price = "3000";
+        else if (token.symbol === "BTC") price = "60000";
+        else if (token.symbol === "LINK") price = "15";
+        
+        transactions.push({
+          id: i + 6,
+          type: Math.random() > 0.5 ? "buy" : "sell",
+          status: "completed",
+          fromToken: null,
+          toToken: null,
+          fromAmount: "0",
+          toAmount: "0",
+          price,
+          txHash: `0x${Math.random().toString(16).slice(2, 66)}`,
+          networkFee: "0.001",
+          createdAt: new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString(),
+          timestamp: Math.floor(Date.now() / 1000) - i * 24 * 60 * 60,
+          // Additional fields for UI differentiation
+          token: {
+            id: token.id,
+            symbol: token.symbol,
+            name: token.name,
+            logoUrl: token.logoUrl,
+          },
+          baseToken: {
+            id: baseToken.id,
+            symbol: baseToken.symbol,
+            name: baseToken.name,
+            logoUrl: baseToken.logoUrl,
+          },
+          amount,
+          total: (parseFloat(amount) * parseFloat(price)).toFixed(4),
+        });
+      }
+      
+      // Sort by timestamp (newest first)
+      transactions.sort((a, b) => b.timestamp - a.timestamp);
+      
+      res.json(transactions);
+    } catch (error) {
+      handleApiError(res, error);
+    }
+  });
+
+  // Get gas price
+  app.get('/api/gas', (req, res) => {
+    const gasPrice = {
+      gasPrice: "30",
+      unit: "gwei",
+      timestamp: new Date().toISOString(),
+    };
+    
+    res.json(gasPrice);
+  });
+
+  return app;
 }
