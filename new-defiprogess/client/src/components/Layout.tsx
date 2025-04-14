@@ -3,7 +3,7 @@ import { Link, useLocation } from 'wouter';
 import { useWeb3 } from '@/lib/web3';
 import WalletConnectModal from './WalletConnectModal';
 import { useQuery } from '@tanstack/react-query';
-import { fetchGasPrice } from '@/lib/api';
+import { fetchGasPrice, GasPrice } from '@/lib/api';
 
 interface LayoutProps {
   children: ReactNode;
@@ -14,8 +14,9 @@ const Layout = ({ children }: LayoutProps) => {
   const { isConnected, address, disconnectWallet } = useWeb3();
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
 
-  const { data: gasPrice } = useQuery({ 
-    queryKey: ['/api/gas-price'],
+  const { data: gasPrice } = useQuery<GasPrice>({ 
+    queryKey: ['gas-price'],
+    queryFn: fetchGasPrice,
     refetchInterval: 30000 // Refresh every 30 seconds
   });
 
@@ -48,14 +49,13 @@ const Layout = ({ children }: LayoutProps) => {
           <ul className="space-y-1">
             {navItems.map((item) => (
               <li key={item.path}>
-                <Link href={item.path}>
-                  <a className={`flex items-center p-3 rounded-lg ${isActive(item.path) 
+                <div onClick={() => window.location.href = item.path} 
+                  className={`flex items-center p-3 rounded-lg cursor-pointer ${isActive(item.path) 
                     ? 'bg-primary bg-opacity-20 text-primary-light' 
                     : 'hover:bg-neutral-700'}`}>
-                    <i className={`${item.icon} mr-3 text-lg`}></i>
-                    <span>{item.label}</span>
-                  </a>
-                </Link>
+                  <i className={`${item.icon} mr-3 text-lg`}></i>
+                  <span>{item.label}</span>
+                </div>
               </li>
             ))}
           </ul>
@@ -131,12 +131,14 @@ const Layout = ({ children }: LayoutProps) => {
       <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-neutral-800 border-t border-neutral-700 py-2 z-10">
         <div className="flex justify-around">
           {navItems.map((item) => (
-            <Link key={item.path} href={item.path}>
-              <a className={`flex flex-col items-center px-3 py-1 ${isActive(item.path) ? 'text-primary' : 'text-neutral-400'}`}>
-                <i className={`${item.icon} text-lg`}></i>
-                <span className="text-xs mt-1">{item.label}</span>
-              </a>
-            </Link>
+            <div 
+              key={item.path} 
+              onClick={() => window.location.href = item.path}
+              className={`flex flex-col items-center px-3 py-1 cursor-pointer ${isActive(item.path) ? 'text-primary' : 'text-neutral-400'}`}
+            >
+              <i className={`${item.icon} text-lg`}></i>
+              <span className="text-xs mt-1">{item.label}</span>
+            </div>
           ))}
         </div>
       </div>

@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { ArrowTrendingDown } from 'lucide-react'; // Added import for ArrowTrendingDown
 
 // Create an axios instance with default configuration
 const api = axios.create({
@@ -170,7 +169,7 @@ export interface ChartData {
 
 export const fetchTokens = async (): Promise<Token[]> => {
   try {
-    const response = await api.get("/api/tokens");
+    const response = await api.get("/tokens");
     return response.data;
   } catch (error) {
     return handleApiError(error);
@@ -179,7 +178,7 @@ export const fetchTokens = async (): Promise<Token[]> => {
 
 export const fetchTokenPrices = async (): Promise<TokenPrice[]> => {
   try {
-    const response = await api.get('/api/prices');
+    const response = await api.get('/prices');
     return response.data;
   } catch (error) {
     return handleApiError(error);
@@ -188,7 +187,7 @@ export const fetchTokenPrices = async (): Promise<TokenPrice[]> => {
 
 export const fetchChartData = async (coinSymbol: string, days: string = '1'): Promise<ChartData> => {
   try {
-    const response = await api.get(`/api/coins/${coinSymbol}/chart?days=${days}`);
+    const response = await api.get(`/coins/${coinSymbol}/chart?days=${days}`);
     return response.data;
   } catch (error) {
     return handleApiError(error);
@@ -197,7 +196,7 @@ export const fetchChartData = async (coinSymbol: string, days: string = '1'): Pr
 
 export const fetchPortfolio = async (walletAddress: string): Promise<Portfolio> => {
   try {
-    const response = await api.get(`/api/portfolio/${walletAddress}`);
+    const response = await api.get(`/portfolio/${walletAddress}`);
     return response.data;
   } catch (error) {
     return handleApiError(error);
@@ -206,7 +205,7 @@ export const fetchPortfolio = async (walletAddress: string): Promise<Portfolio> 
 
 export const fetchTransactions = async (walletAddress: string): Promise<Transaction[]> => {
   try {
-    const response = await api.get(`/api/transactions/${walletAddress}`);
+    const response = await api.get(`/transactions/${walletAddress}`);
     return response.data;
   } catch (error) {
     return handleApiError(error);
@@ -216,9 +215,11 @@ export const fetchTransactions = async (walletAddress: string): Promise<Transact
 export const fetchGasPrice = async (): Promise<GasPrice> => {
   try {
     const response = await api.get('/gas-price');
-    return response.data;
+    console.log('Gas price response:', response.data);
+    return response.data as GasPrice;
   } catch (error) {
-    return handleApiError(error);
+    console.error('Error fetching gas price:', error);
+    throw handleApiError(error);
   }
 };
 
