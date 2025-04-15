@@ -265,7 +265,7 @@ const Portfolio = () => {
               </TabsList>
               
               <TabsContent value="all" className="space-y-3">
-                {portfolio?.assets.map((asset) => (
+                {assets.map((asset) => (
                   <div key={asset.id} className="flex items-center p-3 bg-neutral-700 rounded-lg">
                     <div className="w-10 h-10 rounded-full bg-neutral-600 flex items-center justify-center overflow-hidden mr-4">
                       <img src={asset.token.logoUrl} alt={asset.token.symbol} className="w-6 h-6" />
@@ -285,7 +285,7 @@ const Portfolio = () => {
                   </div>
                 ))}
                 
-                {portfolio?.assets.length === 0 && (
+                {assets.length === 0 && (
                   <div className="text-center py-6 text-neutral-400">
                     <i className="ri-file-list-3-line text-3xl mb-2"></i>
                     <p>No assets found in your portfolio</p>

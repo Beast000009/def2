@@ -24,8 +24,9 @@ const SwapInterface = () => {
   const [toTokenId, setToTokenId] = useState<number | undefined>();
   const [fromAmount, setFromAmount] = useState<string>('');
   const [toAmount, setToAmount] = useState<string>('');
-  const { address, isConnected, provider } = useWeb3();
+  const { address, isConnected, provider, signer, executeSwap, getSwapEstimate } = useWeb3();
   const { toast } = useToast();
+  const [isSwapping, setIsSwapping] = useState(false);
 
   // Data queries
   const { data: tokens } = useQuery<Token[]>({
@@ -77,6 +78,59 @@ const SwapInterface = () => {
       });
     }
   });
+  
+  // Direct blockchain swap function
+  const executeBlockchainSwap = async () => {
+    if (!fromToken || !toToken || !fromAmount || !signer) return;
+    
+    try {
+      setIsSwapping(true);
+      
+      // Set a minimum output amount (slippage of 1%)
+      const minOutputAmount = (parseFloat(toAmount) * 0.99).toString();
+      
+      // Get contract addresses from token data
+      const fromTokenAddress = fromToken.contractAddress || ethers.ZeroAddress;
+      const toTokenAddress = toToken.contractAddress || ethers.ZeroAddress;
+      
+      // Execute the swap directly using web3Context
+      const tx = await executeSwap({
+        amountIn: fromAmount,
+        amountOutMin: minOutputAmount,
+        tokenIn: fromTokenAddress,
+        tokenOut: toTokenAddress
+      });
+      
+      toast({
+        title: 'Swap Executed',
+        description: `Transaction sent: ${tx.hash.substring(0, 10)}...`,
+      });
+      
+      // Wait for transaction receipt
+      const receipt = await tx.wait();
+      
+      toast({
+        title: 'Swap Completed',
+        description: `Successfully swapped ${fromAmount} ${fromToken.symbol} to ${toToken.symbol}`,
+      });
+      
+      // Refresh the balances
+      queryClient.invalidateQueries({ queryKey: ['/api/portfolio'] });
+      
+      // Reset form
+      setFromAmount('');
+      setToAmount('');
+    } catch (error) {
+      console.error('Swap error:', error);
+      toast({
+        title: 'Swap Failed',
+        description: error instanceof Error ? error.message : 'Transaction reverted',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsSwapping(false);
+    }
+  };
 
   // Helper functions
   const getTokenById = (id?: number) => {
@@ -195,12 +249,18 @@ const SwapInterface = () => {
       return;
     }
 
-    swapMutation.mutate({
-      fromTokenId,
-      toTokenId,
-      fromAmount,
-      walletAddress: address || undefined
-    });
+    // If connected to Ganache or real network, use direct blockchain swap
+    if (signer && provider) {
+      executeBlockchainSwap();
+    } else {
+      // Fall back to API-based swap (for demonstration or testing)
+      swapMutation.mutate({
+        fromTokenId,
+        toTokenId,
+        fromAmount,
+        walletAddress: address || undefined
+      });
+    }
   };
   
   // Side effects
