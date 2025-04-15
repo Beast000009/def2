@@ -144,12 +144,35 @@ const SwapInterface = () => {
     return price ? parseFloat(price.price) : null;
   };
 
-  const calculateToAmount = () => {
+  const calculateToAmount = async () => {
     if (!fromAmount || !fromTokenId || !toTokenId) {
       setToAmount('');
       return;
     }
 
+    // First try to use blockchain-based swap estimator if available
+    if (provider && signer && fromToken && toToken && isConnected) {
+      try {
+        // If the token addresses are available and we have a provider/signer
+        if (fromToken.contractAddress && toToken.contractAddress) {
+          const estimatedAmount = await getSwapEstimate(
+            fromAmount,
+            fromToken.contractAddress,
+            toToken.contractAddress
+          );
+          
+          if (estimatedAmount) {
+            setToAmount(estimatedAmount);
+            return;
+          }
+        }
+      } catch (error) {
+        console.error("Error estimating swap:", error);
+        // Fall back to price-based estimation
+      }
+    }
+    
+    // Fall back to price-based estimation
     const fromPrice = getTokenPrice(fromTokenId);
     const toPrice = getTokenPrice(toTokenId);
 
@@ -184,26 +207,29 @@ const SwapInterface = () => {
   };
 
   const handleMaxClick = () => {
-    // Use the portfolio data that's already available from the query
-    const fromToken = getTokenById(fromTokenId);
-    
-    // Set amount to the current balance, or use sensible defaults
-    if (fromToken) {
-      if (portfolio?.assets) {
-        const asset = portfolio.assets.find((a: PortfolioAsset) => a.token.id === fromTokenId);
-        if (asset) {
-          setFromAmount(asset.balance);
-          return;
-        }
-      }
-      
-      // Use sensible defaults for tokens not in portfolio or when portfolio not available
-      if (fromToken.symbol === 'ETH') {
-        setFromAmount('0.01');
-      } else if (fromToken.symbol === 'USDT') {
-        setFromAmount('10');
+    // Use the current balance from the state that gets updated from blockchain
+    if (fromTokenBalance && parseFloat(fromTokenBalance) > 0) {
+      // If token is ETH, leave some for gas
+      if (fromToken?.symbol === 'ETH') {
+        const ethBalance = parseFloat(fromTokenBalance);
+        const ethForGas = 0.01; // Leave 0.01 ETH for gas
+        const maxAmount = Math.max(0, ethBalance - ethForGas);
+        setFromAmount(maxAmount.toString());
       } else {
-        setFromAmount('1');
+        // For other tokens, use the full balance
+        setFromAmount(fromTokenBalance);
+      }
+    } else {
+      // Use sensible defaults if no balance is available
+      const fromToken = getTokenById(fromTokenId);
+      if (fromToken) {
+        if (fromToken.symbol === 'ETH') {
+          setFromAmount('0.01');
+        } else if (fromToken.symbol === 'USDT') {
+          setFromAmount('10');
+        } else {
+          setFromAmount('1');
+        }
       }
     }
   };
@@ -265,8 +291,14 @@ const SwapInterface = () => {
   
   // Side effects
   useEffect(() => {
-    calculateToAmount();
-  }, [fromAmount, fromTokenId, toTokenId, tokenPrices]);
+    // Create an async function inside the useEffect
+    const updateToAmount = async () => {
+      await calculateToAmount();
+    };
+    
+    // Call the async function
+    updateToAmount();
+  }, [fromAmount, fromTokenId, toTokenId, tokenPrices, provider, signer]);
 
   // Computed values
   const fromTokenUsdValue = fromAmount && fromTokenId ? 
@@ -506,9 +538,17 @@ const SwapInterface = () => {
         <Button 
           className="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-4 px-6 rounded-lg transition-colors shadow-md"
           onClick={handleSwap}
-          disabled={swapMutation.isPending || !fromAmount || !fromTokenId || !toTokenId || parseFloat(fromAmount) <= 0 || (isConnected && parseFloat(fromAmount) > parseFloat(fromTokenBalance))}
+          disabled={
+            isSwapping || 
+            swapMutation.isPending || 
+            !fromAmount || 
+            !fromTokenId || 
+            !toTokenId || 
+            parseFloat(fromAmount) <= 0 || 
+            (isConnected && parseFloat(fromAmount) > parseFloat(fromTokenBalance))
+          }
         >
-          {swapMutation.isPending ? (
+          {isSwapping || swapMutation.isPending ? (
             <div className="flex items-center justify-center">
               <Loader2 className="mr-2 h-5 w-5 animate-spin" /> 
               Swapping...
