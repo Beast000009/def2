@@ -256,7 +256,15 @@ const PriceOverview = () => {
                         <td className="py-3">
                           <div className="flex items-center">
                             <div className="w-8 h-8 rounded-full bg-neutral-700 flex items-center justify-center overflow-hidden mr-2">
-                              <img src={token.logoUrl} alt={token.symbol} className="w-5 h-5" />
+                              <img 
+                                src={token.logoUrl} 
+                                alt={token.symbol} 
+                                className="w-5 h-5"
+                                onError={(e) => {
+                                  e.currentTarget.src = `https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2/logo.png`;
+                                  e.currentTarget.onerror = null;
+                                }}
+                              />
                             </div>
                             <div>
                               <div className="font-medium">{token.name}</div>
@@ -296,7 +304,15 @@ const PriceOverview = () => {
                   >
                     <div className="flex items-center mb-3">
                       <div className="w-8 h-8 rounded-full bg-neutral-800 flex items-center justify-center overflow-hidden mr-2">
-                        <img src={token.logoUrl} alt={token.symbol} className="w-5 h-5" />
+                        <img 
+                          src={token.logoUrl} 
+                          alt={token.symbol} 
+                          className="w-5 h-5"
+                          onError={(e) => {
+                            e.currentTarget.src = `https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2/logo.png`;
+                            e.currentTarget.onerror = null;
+                          }}
+                        />
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center justify-between">
@@ -379,7 +395,15 @@ const PriceOverview = () => {
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-full bg-neutral-800 flex items-center justify-center overflow-hidden">
-                    <img src={selectedToken.logoUrl} alt={selectedToken.symbol} className="w-5 h-5" />
+                    <img 
+                      src={selectedToken.logoUrl} 
+                      alt={selectedToken.symbol} 
+                      className="w-5 h-5"
+                      onError={(e) => {
+                        e.currentTarget.src = `https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2/logo.png`;
+                        e.currentTarget.onerror = null;
+                      }}
+                    />
                   </div>
                   {selectedToken.name} 
                   <span className="text-neutral-400 ml-1">({selectedToken.symbol})</span>
