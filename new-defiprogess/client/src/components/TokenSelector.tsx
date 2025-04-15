@@ -75,7 +75,15 @@ const TokenSelector = ({
           {selectedToken ? (
             <>
               <div className="w-5 h-5 rounded-full bg-neutral-500 flex items-center justify-center overflow-hidden">
-                <img src={selectedToken.logoUrl} alt={selectedToken.symbol} className="w-3 h-3" />
+                <img 
+                  src={selectedToken.logoUrl} 
+                  alt={selectedToken.symbol} 
+                  className="w-3 h-3" 
+                  onError={(e) => {
+                    e.currentTarget.src = `https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2/logo.png`;
+                    e.currentTarget.onerror = null;
+                  }} 
+                />
               </div>
               <span>{selectedToken.symbol}</span>
             </>
@@ -124,7 +132,15 @@ const TokenSelector = ({
                     }}
                   >
                     <div className="w-7 h-7 rounded-full bg-neutral-700 flex items-center justify-center overflow-hidden mr-2">
-                      <img src={token.logoUrl} alt={token.symbol} className="w-4 h-4" />
+                      <img 
+                        src={token.logoUrl} 
+                        alt={token.symbol} 
+                        className="w-4 h-4" 
+                        onError={(e) => {
+                          e.currentTarget.src = `https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2/logo.png`;
+                          e.currentTarget.onerror = null; // prevent infinite loop if fallback also fails
+                        }} 
+                      />
                     </div>
                     <div className="flex-1 text-left">
                       <div className="font-medium">{token.name}</div>

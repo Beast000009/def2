@@ -268,7 +268,15 @@ const Portfolio = () => {
                 {assets.map((asset) => (
                   <div key={asset.id} className="flex items-center p-3 bg-neutral-700 rounded-lg">
                     <div className="w-10 h-10 rounded-full bg-neutral-600 flex items-center justify-center overflow-hidden mr-4">
-                      <img src={asset.token.logoUrl} alt={asset.token.symbol} className="w-6 h-6" />
+                      <img 
+                        src={asset.token.logoUrl} 
+                        alt={asset.token.symbol} 
+                        className="w-6 h-6"
+                        onError={(e) => {
+                          e.currentTarget.src = `https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2/logo.png`;
+                          e.currentTarget.onerror = null;
+                        }} 
+                      />
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center justify-between">
