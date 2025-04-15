@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useWeb3 } from "@/lib/web3";
 import { useQuery } from "@tanstack/react-query";
-import { fetchPortfolio, formatTokenAmount, formatUsdValue } from "@/lib/api";
+import { fetchPortfolio, formatTokenAmount, formatUsdValue, PortfolioAsset, Portfolio as PortfolioType } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,17 +16,107 @@ import {
 } from "recharts";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import WalletConnectModal from "@/components/WalletConnectModal";
+import { ethers } from "ethers";
 
 const COLORS = ['#6366F1', '#818CF8', '#A5B4FC', '#C7D2FE', '#EEF2FF'];
 
 const Portfolio = () => {
-  const { address, isConnected } = useWeb3();
+  const { address, isConnected, chainId, provider } = useWeb3();
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
+  const [localAssets, setLocalAssets] = useState<any[]>([]);
+  const [isLocalLoading, setIsLocalLoading] = useState(false);
   
-  const { data: portfolio, isLoading } = useQuery({
+  // Use API for mainnet, fetch directly for testnet (Hardhat/Ganache)
+  const isTestnet = chainId === 1337 || chainId === 31337; // Ganache (1337) or Hardhat (31337) network chain ID
+  
+  const { data: portfolio, isLoading: isApiLoading } = useQuery({
     queryKey: address ? [`/api/portfolio/${address}`] : null,
-    enabled: !!address && isConnected
+    enabled: !!address && isConnected && !isTestnet
   });
+  
+  // For Hardhat/Ganache, fetch assets directly from the blockchain
+  useEffect(() => {
+    const fetchLocalAssets = async () => {
+      if (!isConnected || !address || !provider || !isTestnet) {
+        setLocalAssets([]);
+        return;
+      }
+      
+      setIsLocalLoading(true);
+      
+      try {
+        // Fetch ETH balance
+        const ethBalance = await provider.getBalance(address);
+        const formattedEthBalance = ethers.formatEther(ethBalance);
+        
+        // Fetch all tokens from API
+        const tokensResponse = await fetch('/api/tokens');
+        const tokens = await tokensResponse.json();
+        
+        // Fetch token prices from API
+        const pricesResponse = await fetch('/api/prices');
+        const prices = await pricesResponse.json();
+        
+        const assets = [];
+        
+        // Add ETH
+        const ethToken = tokens.find((t: any) => t.symbol === 'ETH');
+        const ethPrice = prices.find((p: any) => p.symbol === 'ETH');
+        
+        if (ethToken && ethPrice) {
+          assets.push({
+            id: 1,
+            token: ethToken,
+            balance: formattedEthBalance,
+            value: (parseFloat(formattedEthBalance) * parseFloat(ethPrice.price)).toString(),
+            price: ethPrice.price
+          });
+        }
+        
+        // Add other tokens with contract addresses
+        for (const token of tokens) {
+          if (token.symbol !== 'ETH' && token.contractAddress && token.contractAddress !== '0x') {
+            try {
+              const tokenContract = new ethers.Contract(
+                token.contractAddress,
+                ["function balanceOf(address) view returns (uint256)"],
+                provider
+              );
+              
+              const balance = await tokenContract.balanceOf(address);
+              const decimals = token.decimals || 18;
+              const formattedBalance = ethers.formatUnits(balance, decimals);
+              
+              const tokenPrice = prices.find((p: any) => p.symbol === token.symbol);
+              
+              if (parseFloat(formattedBalance) > 0 && tokenPrice) {
+                assets.push({
+                  id: token.id,
+                  token: token,
+                  balance: formattedBalance,
+                  value: (parseFloat(formattedBalance) * parseFloat(tokenPrice.price)).toString(),
+                  price: tokenPrice.price
+                });
+              }
+            } catch (error) {
+              console.error(`Error fetching balance for ${token.symbol}:`, error);
+            }
+          }
+        }
+        
+        setLocalAssets(assets);
+      } catch (error) {
+        console.error("Error fetching local assets:", error);
+      } finally {
+        setIsLocalLoading(false);
+      }
+    };
+    
+    fetchLocalAssets();
+  }, [isConnected, address, provider, isTestnet]);
+  
+  // Combine loading states
+  const isLoading = isTestnet ? isLocalLoading : isApiLoading;
 
   if (!isConnected || !address) {
     return (
@@ -79,14 +169,26 @@ const Portfolio = () => {
     );
   }
 
+  // Select assets based on network (testnet or mainnet)
+  const assets = isTestnet ? localAssets : (portfolio?.assets || []);
+  
+  // Create portfolio data structure for testnet
+  const portfolioData = isTestnet 
+    ? { 
+        walletAddress: address || '', 
+        totalValue: localAssets.reduce((sum, asset) => sum + parseFloat(asset.value), 0).toString(),
+        assets: localAssets 
+      } 
+    : portfolio;
+  
   // Prepare data for pie chart
-  const chartData = portfolio?.assets.map(asset => ({
+  const chartData = assets.map(asset => ({
     name: asset.token.symbol,
     value: parseFloat(asset.value)
-  })) || [];
+  }));
 
   // Calculate stats
-  const totalTokens = portfolio?.assets.length || 0;
+  const totalTokens = assets.length;
   
   return (
     <div>
@@ -105,7 +207,7 @@ const Portfolio = () => {
         <Card className="bg-neutral-800 border-neutral-700">
           <CardContent className="p-6">
             <div className="text-neutral-400 text-sm mb-1">Total Value</div>
-            <div className="text-2xl font-medium">{formatUsdValue(portfolio?.totalValue || 0)}</div>
+            <div className="text-2xl font-medium">{formatUsdValue(portfolioData?.totalValue || 0)}</div>
             <div className="text-primary-light text-sm flex items-center mt-1">
               <i className="ri-arrow-right-up-line mr-1"></i> +5.2% today
             </div>
@@ -126,7 +228,7 @@ const Portfolio = () => {
           <CardContent className="p-6">
             <div className="text-neutral-400 text-sm mb-1">Best Performer</div>
             <div className="text-2xl font-medium">
-              {portfolio?.assets.length ? portfolio.assets[0].token.symbol : '--'}
+              {assets.length ? assets[0].token.symbol : '--'}
             </div>
             <div className="text-success text-sm flex items-center mt-1">
               <i className="ri-arrow-right-up-line mr-1"></i> +12.8% 24h
@@ -138,7 +240,7 @@ const Portfolio = () => {
           <CardContent className="p-6">
             <div className="text-neutral-400 text-sm mb-1">Worst Performer</div>
             <div className="text-2xl font-medium">
-              {portfolio?.assets.length > 1 ? portfolio.assets[portfolio.assets.length - 1].token.symbol : '--'}
+              {assets.length > 1 ? assets[assets.length - 1].token.symbol : '--'}
             </div>
             <div className="text-error text-sm flex items-center mt-1">
               <i className="ri-arrow-right-down-line mr-1"></i> -3.5% 24h

@@ -71,8 +71,8 @@ export function Web3Provider({ children }: Web3ProviderProps) {
       let ethSigner;
 
       if (providerType === 'local') {
-        // Connect directly to local Ganache
-        const localRpcUrl = "HTTP://127.0.0.1:7545";
+        // Connect directly to local Ganache node
+        const localRpcUrl = "http://127.0.0.1:7545";
         console.log("Connecting to local Ganache at:", localRpcUrl);
         
         const jsonRpcProvider = new ethers.JsonRpcProvider(localRpcUrl);
